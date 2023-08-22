@@ -17,6 +17,7 @@ db_config = {
 # Establish a connection to the database
 connection = mysql.connector.connect(**db_config)
 
+# ~ temp code to list out all the data inside the database
 if connection.is_connected():
     cursor = connection.cursor()
     
@@ -29,107 +30,7 @@ if connection.is_connected():
         
     cursor.close()
 
-# ~ # Close the connection when you're done
-# ~ connection.close()
-
-class QrPage(tk.Frame):
-    def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent, bg="orange")
-        self.controller = controller
-        self.controller.geometry("1024x600")
-        
-        label = tk.Label(self, text="Scan QR code here")
-        label.pack(pady=10, padx=10)
-        
-        self.label_widget = tk.Label(self, bg="orange")  # Define label_widget as an instance variable
-        self.label_widget.pack()
-        
-        button1 = tk.Button(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller))
-        button1.place(relx=0.1, rely=0.8, anchor=tk.CENTER)
-        
-        button_camera = tk.Button(self, text="Toggle Camera", command=self.toggle_camera)
-        button_camera.place(relx=0.1, rely=0.6, anchor=tk.CENTER)
-        
-        # ~ close_camera = tk.Button(self, text="Close Camera", command=self.close_camera)
-        # ~ close_camera.place(relx=0.1, rely=0.65, anchor=tk.CENTER)
-        
-        # Add a flag to control the camera feed
-        self.camera_running = False
-        
-        # Store the start time when the camera is opened
-        self.start_time = None
-        
-    def toggle_camera(self):
-        if self.camera_running:
-            self.close_camera()
-        else:
-            self.open_camera()
-        
-    def open_camera(self):     
-        self.start_time = time.time()  # Store the start time
-        self.camera_running = True
-        self.camera_feed_loop()
-        
-        
-    def camera_feed_loop(self):
-        if self.camera_running and time.time() - self.start_time <= 30:  # Check if less than 30 seconds
-            _, frame = vid.read()
-            data, decoded_info, _ = detector.detectAndDecode(frame)
-            # ~ user_id_dat, user_pass_dat = data.split(',')
-            
-            opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-            captured_image = Image.fromarray(opencv_image)
-            photo_image = ImageTk.PhotoImage(image=captured_image)
-            
-            self.label_widget.photo_image = photo_image
-            self.label_widget.configure(image=photo_image)
-            
-            # ~ connect to database
-            connection = mysql.connector.connect(**db_config)
-            
-            if data:
-                # ~ Used to interact with the db object
-                cursor = connection.cursor()
-                
-                user_id_dat, user_pass_dat = data.split(',')
-                query = "SELECT * FROM user WHERE user_id = %s AND unique_pass = %s"
-                cursor.execute(query, (user_id_dat, user_pass_dat))
-                
-                # interact to the next row of the database
-                row = cursor.fetchone()
-                
-                if row:
-                    print("Valid user")
-                else:
-                    print("Invalid user")
-                    
-                print("Data acquired")
-                print("user ID: ",user_id_dat)
-                print("User pass: ",user_pass_dat)
-                user_id_dat, user_pass_dat = (' ', ' ')
-                
-                self.close_camera()
-                connection.close()
-            else:
-                print("No Data")
-            
-            self.label_widget.after(10, self.camera_feed_loop)
-            
-        else:
-            self.close_camera()
-        
-    def close_camera(self):
-        # ~ vid.release()
-        self.camera_running = False
-        
-        #Reset the label_widget
-        self.label_widget.photo_image = None
-        self.label_widget.configure(image=None)
-        
-    def close_camera_and_return(self, controller):
-        self.close_camera()
-        controller.show_frame(StartPage)
-
+# ~ basically holds all the other page and manage the page swap
 class MainFrame(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
@@ -155,6 +56,7 @@ class MainFrame(tk.Tk):
         frame = self.frames[cont]
         frame.tkraise()
 
+# ~ the global frame conf
 class StartPage(tk.Frame):
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
@@ -177,23 +79,28 @@ class PassPage(tk.Frame):
         entered_userid = userid.get()
         entered_userpass = userpass.get()
         connection = mysql.connector.connect(**db_config)
-
+        
+        # ~ used to check if the user id and pass is valid(available in db)
         if connection.is_connected():
             cursor = connection.cursor()
-
             query = "SELECT * FROM user WHERE user_id = %s AND unique_pass = %s"
             cursor.execute(query, (entered_userid, entered_userpass))
-
             row = cursor.fetchone()
-
+            lockerNum = row[2]
             if row:
-                print("Opening Locker")
+                print("Opening locker: ", lockerNum)
+                
+                # ~ temp code to test updating a field on the db
+                newLockerNum = "a1"
+                query = "UPDATE user SET locker_No = %s WHERE user_id = %s"
+                cursor.execute(query, (newLockerNum, entered_userid))
+                connection.commit()
+                
+                print("Changing locker num from ", lockerNum, " to ", newLockerNum)
             else:
                 print("Invalid UserID or Password")
-
             cursor.close()
             connection.close()
-
         else:
             print("Database connection error")
             connection.close()
@@ -225,6 +132,107 @@ class PassPage(tk.Frame):
                          command=lambda: controller.show_frame(StartPage))
         button1.place(relx=0.5, rely=0.8, anchor=CENTER)
 
+class QrPage(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent, bg="orange")
+        self.controller = controller
+        self.controller.geometry("1024x600")
+        
+        label = tk.Label(self, text="Scan QR code here")
+        label.pack(pady=10, padx=10)
+        
+        self.label_widget = tk.Label(self, bg="orange")  # Define label_widget as an instance variable
+        self.label_widget.pack()
+        
+        button1 = tk.Button(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller))
+        button1.place(relx=0.1, rely=0.8, anchor=tk.CENTER)
+        
+        button_camera = tk.Button(self, text="Toggle Camera", command=self.toggle_camera)
+        button_camera.place(relx=0.1, rely=0.6, anchor=tk.CENTER)
+        
+        # Add a flag to control the camera feed
+        self.camera_running = False
+        
+        # Store the start time when the camera is opened
+        self.start_time = None
+        
+    def toggle_camera(self):
+        if self.camera_running:
+            self.close_camera()
+        else:
+            self.open_camera()
+        
+    def open_camera(self):     
+        self.start_time = time.time()  # Store the start time
+        self.camera_running = True
+        self.camera_feed_loop()
+        
+        
+    def camera_feed_loop(self):
+        # ~ if the camera is on for more than 30 seconds, it will automatically shut itself down
+        if self.camera_running and time.time() - self.start_time <= 30:
+            _, frame = vid.read()
+            data, decoded_info, _ = detector.detectAndDecode(frame)
+            
+            # ~ configure the raspi cam settings
+            opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+            
+            # ~ capture the feed as image and parse it as a var to be displayed on the label_widget
+            captured_image = Image.fromarray(opencv_image)
+            photo_image = ImageTk.PhotoImage(image=captured_image)
+            self.label_widget.photo_image = photo_image
+            self.label_widget.configure(image=photo_image)
+            
+            # ~ connect to database
+            connection = mysql.connector.connect(**db_config)
+            
+            if data:
+                # ~ Used to interact with the db object
+                cursor = connection.cursor()
+                
+                user_id_dat, user_pass_dat, user_locker_num = data.split(',')
+                query = "SELECT * FROM user WHERE user_id = %s AND unique_pass = %s"
+                cursor.execute(query, (user_id_dat, user_pass_dat))
+                
+                # interact to the next row of the database
+                row = cursor.fetchone()
+                lockerNum = row[2]
+                if row:
+                    print("Valid user")
+                    print("Opening Locker ", lockerNum)
+                    # ~ temp code to check the data captured from the qr
+                    print(" ")
+                    print("user ID: ",user_id_dat)
+                    print("User pass: ",user_pass_dat)
+                    user_id_dat, user_pass_dat, user_locker_num = (' ', ' ', ' ')
+                else:
+                    print("Invalid user")
+                    # ~ temp code to check the data captured from the qr
+                    print(" ")
+                    print("user ID: ",user_id_dat)
+                    print("User pass: ",user_pass_dat)
+                    user_id_dat, user_pass_dat, user_locker_num = (' ', ' ', ' ')
+                
+                self.close_camera()
+                connection.close()
+            else:
+                print("No Data")
+            
+            self.label_widget.after(10, self.camera_feed_loop)
+            
+        else:
+            self.close_camera()
+        
+    def close_camera(self):
+        self.camera_running = False
+        
+        #Reset the label_widget
+        self.label_widget.photo_image = None
+        self.label_widget.configure(image=None)
+        
+    def close_camera_and_return(self, controller):
+        self.close_camera()
+        controller.show_frame(StartPage)
 
 # Define a video capture object
 vid = cv2.VideoCapture(0)
