@@ -141,6 +141,7 @@ class QrPage(tk.Frame):
         label = tk.Label(self, text="Scan QR code here")
         label.pack(pady=10, padx=10)
         
+        # ~ this label widget is used to display the video feed
         self.label_widget = tk.Label(self, bg="orange")  # Define label_widget as an instance variable
         self.label_widget.pack()
         
