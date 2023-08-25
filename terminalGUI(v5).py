@@ -17,18 +17,16 @@ db_config = {
 # Establish a connection to the database
 connection = mysql.connector.connect(**db_config)
 
-# ~ temp code to list out all the data inside the database
-if connection.is_connected():
-    cursor = connection.cursor()
-    
-    query = "SELECT * FROM user"
-    cursor.execute(query)
-    
-    rows = cursor.fetchall()
-    for row in rows:
-        print(row)
-        
-    cursor.close()
+# Define a video capture object
+vid = cv2.VideoCapture(0)
+detector = cv2.QRCodeDetector()
+
+# Declare the width and height in variables
+width, height = 640, 480
+
+# Set the width and height
+vid.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+vid.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
 # ~ basically holds all the other page and manage the page swap
 class MainFrame(tk.Tk):
@@ -74,37 +72,8 @@ class StartPage(tk.Frame):
                               command=lambda: controller.show_frame(QrPage))
         self.button2.place(relx=0.65, rely=0.5, anchor=CENTER)
 
-class PassPage(tk.Frame):
-    def openLocker(self, userid, userpass):
-        entered_userid = userid.get()
-        entered_userpass = userpass.get()
-        connection = mysql.connector.connect(**db_config)
-        
-        # ~ used to check if the user id and pass is valid(available in db)
-        if connection.is_connected():
-            cursor = connection.cursor()
-            query = "SELECT * FROM user WHERE user_id = %s AND unique_pass = %s"
-            cursor.execute(query, (entered_userid, entered_userpass))
-            row = cursor.fetchone()
-            lockerNum = row[2]
-            if row:
-                print("Opening locker: ", lockerNum)
-                
-                # ~ temp code to test updating a field on the db
-                newLockerNum = "a1"
-                query = "UPDATE user SET locker_No = %s WHERE user_id = %s"
-                cursor.execute(query, (newLockerNum, entered_userid))
-                connection.commit()
-                
-                print("Changing locker num from ", lockerNum, " to ", newLockerNum)
-            else:
-                print("Invalid UserID or Password")
-            cursor.close()
-            connection.close()
-        else:
-            print("Database connection error")
-            connection.close()
 
+class PassPage(tk.Frame):
     def __init__(self, parent, controller):
         Frame.__init__(self, parent, bg="orange")
         self.controller = controller
@@ -124,13 +93,47 @@ class PassPage(tk.Frame):
         otpEntry = tk.Entry(self, textvariable=self.userpass)
         otpEntry.place(relx=0.5, rely=0.45, anchor=CENTER)
 
-        openbutton = Button(self, text="Open Locker",
-                            command=lambda: self.openLocker(self.userid, self.userpass))  # Pass the user input
+        openbutton = Button(self, text="Open Locker", command=lambda: self.openLocker(self.userid, self.userpass))  # Pass the user input
         openbutton.place(relx=0.5, rely=0.55, anchor=CENTER)
 
-        button1 = Button(self, text="Back to Home",
-                         command=lambda: controller.show_frame(StartPage))
+        button1 = Button(self, text="Back to Home", command=lambda: controller.show_frame(StartPage))
         button1.place(relx=0.5, rely=0.8, anchor=CENTER)
+        
+    def openLocker(self, userid, userpass):
+        entered_userid = userid.get()
+        entered_userpass = userpass.get()
+        # ~ connection = mysql.connector.connect(**db_config)
+
+        # ~ used to check if the user id and pass is valid(available in db)
+        if connection.is_connected():
+            cursor = connection.cursor()
+            query = "SELECT * FROM user WHERE user_id = %s AND unique_pass = %s"
+            cursor.execute(query, (entered_userid, entered_userpass))
+            row = cursor.fetchone()
+            lockerNum = row[2]
+            lockerStatus = row[3]
+            if row:
+                print("Opening locker: ", lockerNum)
+
+                if lockerStatus == "Empty":
+                    newLockerStatus = "Occupied"
+                    query = "UPDATE user SET locker_status = %s WHERE user_id = %s"
+                    cursor.execute(query, (newLockerStatus, entered_userid))
+                    connection.commit()
+                    print("Change locker ", lockerNum, " status to ", newLockerStatus)
+                elif lockerStatus == "Occupied":
+                    newLockerStatus = "Empty"
+                    query = "UPDATE user SET locker_status = %s WHERE user_id = %s" 
+                    cursor.execute(query, (newLockerStatus, entered_userid))
+                    connection.commit()
+                    print("Change locker ", lockerNum, " status to ", newLockerStatus)
+            else:
+                print("Invalid UserID or Password")
+            cursor.close()
+            connection.close()
+        else:
+            print("Database connection error")
+            connection.close()
 
 class QrPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -138,112 +141,129 @@ class QrPage(tk.Frame):
         self.controller = controller
         self.controller.geometry("1024x600")
         
+        self.data = ''
+        self.frame = None
+
         label = tk.Label(self, text="Scan QR code here")
         label.pack(pady=10, padx=10)
-        
+
         # ~ this label widget is used to display the video feed
         self.label_widget = tk.Label(self, bg="orange")  # Define label_widget as an instance variable
-        self.label_widget.pack()
-        
-        button1 = tk.Button(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller))
-        button1.place(relx=0.1, rely=0.8, anchor=tk.CENTER)
-        
-        button_camera = tk.Button(self, text="Toggle Camera", command=self.toggle_camera)
-        button_camera.place(relx=0.1, rely=0.6, anchor=tk.CENTER)
-        
+        self.label_widget.place(relx=0.5, rely=0.55, anchor=tk.CENTER)
+
+        self.button_bck = tk.Button(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller))
+        self.button_bck.place(relx=0.75, rely=0.1, anchor=tk.CENTER)
+
+        self.button_camera = tk.Button(self, text="Toggle QR Scanner", command=self.toggle_camera)
+        self.button_camera.place(relx=0.25, rely=0.1, anchor=tk.CENTER)
+
         # Add a flag to control the camera feed
         self.camera_running = False
-        
+
         # Store the start time when the camera is opened
         self.start_time = None
         
-    def toggle_camera(self):
-        if self.camera_running:
-            self.close_camera()
-        else:
-            self.open_camera()
-        
-    def open_camera(self):     
-        self.start_time = time.time()  # Store the start time
-        self.camera_running = True
-        self.camera_feed_loop()
-        
+        # ~ self.button_bck.config(state=tk.DISABLED)
     def camera_feed_loop(self):
         # ~ if the camera is on for more than 30 seconds, it will automatically shut itself down
-        if self.camera_running and time.time() - self.start_time <= 30:
+        while self.camera_running:
+
             _, frame = vid.read()
             data, decoded_info, _ = detector.detectAndDecode(frame)
             
             # ~ configure the raspi cam settings
             opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-            
-            # ~ capture the feed as image and parse it as a var to be displayed on the label_widget
             captured_image = Image.fromarray(opencv_image)
             photo_image = ImageTk.PhotoImage(image=captured_image)
             self.label_widget.photo_image = photo_image
-            self.label_widget.configure(image=photo_image)
-            
-            # ~ connect to database
-            connection = mysql.connector.connect(**db_config)
-            
+            self.label_widget.config(image=photo_image)
+
             if data:
                 # ~ Used to interact with the db object
                 cursor = connection.cursor()
-                
+                # ~ user_id_dat, user_pass_dat, user_locker_num = '', '', ''
                 user_id_dat, user_pass_dat, user_locker_num = data.split(',')
                 query = "SELECT * FROM user WHERE user_id = %s AND unique_pass = %s"
                 cursor.execute(query, (user_id_dat, user_pass_dat))
-                
+
                 # interact to the next row of the database
                 row = cursor.fetchone()
-                lockerNum = row[2]
+                
                 if row:
+                    lockerStatus = row[3]
+                    print("")
                     print("Valid user")
-                    print("Opening Locker ", lockerNum)
+                    print("Opening Locker ", user_locker_num)
                     # ~ temp code to check the data captured from the qr
-                    print(" ")
-                    print("user ID: ",user_id_dat)
-                    print("User pass: ",user_pass_dat)
-                    user_id_dat, user_pass_dat, user_locker_num = (' ', ' ', ' ')
+                    print("user ID: ", user_id_dat)
+                    print("User pass: ", user_pass_dat)
+                    print("Opening locker: ", user_locker_num)
+                    
+                    if lockerStatus == "Empty":
+                        newLockerStatus = "Occupied"
+                        query = "UPDATE user SET locker_status = %s WHERE user_id = %s"
+                        cursor.execute(query, (newLockerStatus, user_id_dat))
+                        connection.commit()
+                        print("Change locker ", user_locker_num, " status to ", newLockerStatus)
+                        print("")
+                        row = ''
+                        continue
+                    else:
+                        newLockerStatus = "Empty"
+                        query = "UPDATE user SET locker_status = %s WHERE user_id = %s"
+                        cursor.execute(query, (newLockerStatus, user_id_dat))
+                        connection.commit()
+                        print("Change locker ", user_locker_num, " status to ", newLockerStatus)
+                        print("")
+                        row = ''
+                        continue
                 else:
                     print("Invalid user")
                     # ~ temp code to check the data captured from the qr
                     print(" ")
-                    print("user ID: ",user_id_dat)
-                    print("User pass: ",user_pass_dat)
-                    user_id_dat, user_pass_dat, user_locker_num = (' ', ' ', ' ')
-                
+                    print("user ID: ", user_id_dat)
+                    print("User pass: ", user_pass_dat)
+                    row = ''
+                    
                 self.close_camera()
-                connection.close()
+            
             else:
                 print("No Data")
-            
-            self.label_widget.after(10, self.camera_feed_loop)
-            
-        else:
+            self.label_widget.after(30, self.camera_feed_loop)
+    def toggle_camera(self):
+        if self.camera_running:
             self.close_camera()
+        else:
+            self.open_camera()
+ 
+
+    def open_camera(self):
+        global connection
+        connection = mysql.connector.connect(**db_config)
+        print("Open cam")
+            
+        self.start_time = time.time()  # Store the start time
+        self.camera_running = True
+        self.button_bck.config(state=tk.DISABLED) 
+        self.camera_feed_loop()
         
     def close_camera(self):
+        global connection
+        connection.close()
+        print("close cam")
         self.camera_running = False
-        
-        #Reset the label_widget
+        self.button_bck.config(state=tk.NORMAL)
+
+        # Reset the label_widget
         self.label_widget.photo_image = None
         self.label_widget.configure(image=None)
-        
+        data, decoded_info, _ = '', '', ''
+        _, frame = '', ''
+
     def close_camera_and_return(self, controller):
         self.close_camera()
         controller.show_frame(StartPage)
 
-# Define a video capture object
-vid = cv2.VideoCapture(0)
-detector = cv2.QRCodeDetector()
-
-# Declare the width and height in variables
-width, height = 800, 600
-
-# Set the width and height
-vid.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-vid.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
 app = MainFrame()
 app.mainloop()
