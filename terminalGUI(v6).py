@@ -32,7 +32,6 @@ if connection.is_connected():
 
 # Define a video capture object
 vid = cv2.VideoCapture(0)
-# ~ detector = cv2.QRCodeDetector()
 
 # Declare the width and height in variables
 width, height = 640, 480
@@ -115,7 +114,6 @@ class PassPage(tk.Frame):
     def openLocker(self, userid, userpass):
         entered_userid = userid.get()
         entered_userpass = userpass.get()
-        # ~ connection = mysql.connector.connect(**db_config)
 
         # ~ used to check if the user id and pass is valid(available in db)
         if connection.is_connected():
@@ -174,8 +172,7 @@ class QrPage(tk.Frame):
 
         # Store the start time when the camera is opened
         self.start_time = None
-        
-        # ~ self.button_bck.config(state=tk.DISABLED)
+
     def camera_feed_loop(self):
         # ~ if the camera is on for more than 30 seconds, it will automatically shut itself down
         if self.camera_running and time.time() - self.start_time <= 30:
@@ -230,8 +227,6 @@ class QrPage(tk.Frame):
             
         else:
             print("Camera shutting down")
-    
-
             
     def toggle_camera(self):
         if self.camera_running:
@@ -251,9 +246,6 @@ class QrPage(tk.Frame):
         print("close cam")
         self.camera_running = False
         self.button_bck.config(state=tk.NORMAL)
-        
-        # ~ while vid.grab():
-            # ~ pass
 
         # Reset the label_widget
         self.label_widget.photo_image = None
