@@ -51,6 +51,6 @@ if __name__ == '__main__':
 # ~ time.sleep(1)
  
         # Reset by pressing CTRL + C
-        except KeyboardInterrupt:
-                print("Measurement stopped by User")
-                GPIO.cleanup()
+    except KeyboardInterrupt:
+            print("Measurement stopped by User")
+            GPIO.cleanup()
