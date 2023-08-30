@@ -8,6 +8,7 @@ import mysql.connector
 from pyzbar.pyzbar import decode
 import pigpio
 import RPi.GPIO as GPIO
+import datetime
 
 
 # Replace these values with your database configuration
@@ -29,9 +30,6 @@ servo2 = 16
 pwm = pigpio.pi()
 pwm.set_mode(servo, pigpio.OUTPUT)
 pwm.set_mode(servo2, pigpio.OUTPUT)
-
-# ~ pwm.set_PWM_frequency(servo, 50)
-# ~ pwm.set_PWM_frequency(servo2, 50)
 
 #GPIO Mode (BOARD / BCM)
 GPIO.setmode(GPIO.BCM)
@@ -68,8 +66,31 @@ def distance():
     # multiply with the sonic speed (34300 cm/s)
     # and divide by 2, because there and back
     distance = (TimeElapsed * 34300) / 2
+    distance = round(distance, 2)
  
     return distance
+
+def updateLog(rentid):
+    if connection.is_connected():
+        cursor = connection.cursor()
+        
+        query = "SELECT log_message FROM log WHERE rent_id = %s"
+        cursor.execute(query, (rentid,))
+        
+        rows = cursor.fetchall()
+        for row in rows:
+            log_message = row[0]
+            current_time = datetime.datetime.now()
+            formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+            new_log_message = f"{log_message},\nLocker Accessed: {formatted_time}"
+            
+            update_query = "UPDATE log SET log_message = %s WHERE rent_id = %s"
+            cursor.execute(update_query, (new_log_message, rentid))
+            connection.commit()
+            
+            print("Log updated:", new_log_message)
+        
+        cursor.close()
 
 # Define a video capture object
 vid = cv2.VideoCapture(0)
@@ -163,8 +184,8 @@ class PassPage(tk.Frame):
         homebutton.place(relx=0.5, rely=0.8, anchor=CENTER)
         
     def openLocker(self, rentid, otp):
-        entered_rentid = rentid.get()
-        entered_otp = otp.get()
+        rentid = rentid.get()
+        otp = otp.get()
         
         # ~ check the validity of rent id and OTP)
         if connection.is_connected():
@@ -175,7 +196,7 @@ class PassPage(tk.Frame):
                 INNER JOIN locker l ON r.locker_id = l.locker_id
                 WHERE r.rent_id = %s AND r.locker_otp = %s
             """
-            cursor.execute(query, (entered_rentid, entered_otp))
+            cursor.execute(query, (rentid, otp))
             row = cursor.fetchone()
             if row:
                 lockerNum = row[8]
@@ -246,36 +267,67 @@ class QrPage(tk.Frame):
             photo_image = ImageTk.PhotoImage(image=captured_image)
             self.label_widget.photo_image = photo_image
             self.label_widget.configure(image=photo_image)
+            
+            locker_sens = distance()
+            print(locker_sens)
             if decoded_objects:
                 data = decoded_objects[0].data.decode('utf-8')
-                user_id_dat, user_pass_dat, user_locker_num = data.split(',')
+                rentid, otp = data.split(',')
 
                 cursor = connection.cursor()
-                query = "SELECT * FROM user WHERE user_id = %s AND unique_pass = %s"
-                cursor.execute(query, (user_id_dat, user_pass_dat))
+                query = """
+                    SELECT r.*, l.locker_number 
+                    FROM rentdetail r
+                    INNER JOIN locker l ON r.locker_id = l.locker_id
+                    WHERE r.rent_id = %s AND r.locker_otp = %s
+                """
+                cursor.execute(query, (rentid, otp))
                 row = cursor.fetchone()
                 if row:
-                    lockerNum = row[2]
-                    lockerStatus = row[3]
-                    if lockerNum == "a1":
+                    lockerNum = row[8]
+                    if lockerNum == 105:
                         print("Valid user")
                         print("Opening Locker", lockerNum)
-                        self.locker1()
-                        newLockerStatus = "Occupied" if lockerStatus == "Empty" else "Empty"
-                        query = "UPDATE user SET locker_status = %s WHERE user_id = %s"
-                        cursor.execute(query, (newLockerStatus, user_id_dat))
-                        connection.commit()
-                        print("Change locker", lockerNum, "status to", newLockerStatus)
-                        
-                    if lockerNum == "a2":
+                        while True:
+                            while locker_sens <=15:
+                                locker_sens = distance()
+                                time.sleep(1)
+                                self.locker1_open()
+                                if locker_sens > 15:
+                                    break
+                            
+                            while locker_sens >= 15:
+                                print("Door Open")
+                                locker_sens = distance()
+                                if locker_sens < 15:
+                                    time.sleep(2)
+                                    self.locker1_close()
+                                    print("closing door")
+                                    break
+                            break
+                    
+                    # ~ Currently the sensor ius being shared for blocker1_close
+                    # ~ fix it fast
+                    if lockerNum == 202:
                         print("Valid user")
                         print("Opening Locker", lockerNum)
-                        self.locker2()
-                        newLockerStatus = "Occupied" if lockerStatus == "Empty" else "Empty"
-                        query = "UPDATE user SET locker_status = %s WHERE user_id = %s"
-                        cursor.execute(query, (newLockerStatus, user_id_dat))
-                        connection.commit()
-                        print("Change locker", lockerNum, "status to", newLockerStatus)
+                        while True:
+                            while locker_sens <=15:
+                                locker_sens = distance()
+                                time.sleep(1)
+                                self.locker2_open()
+                                if locker_sens > 15:
+                                    break
+                            
+                            while locker_sens >= 15:
+                                print("Door Open")
+                                locker_sens = distance()
+                                if locker_sens < 15:
+                                    time.sleep(2)
+                                    self.locker2_close()
+                                    print("closing door")
+                                    break
+                            break
                         
                 else:
                     print("Invalid QR code data")
@@ -293,23 +345,21 @@ class QrPage(tk.Frame):
             print("Camera shutting down")
             self.close_camera()
     
-    def locker1(self):
-        print("This")
-        pwm.set_servo_pulsewidth(servo, 1500)  # Center the servo
-        time.sleep(1)  # Give it some time to settle
-        pwm.set_PWM_frequency(servo, 50)  # Set the frequency
-        pwm.set_servo_pulsewidth(servo, 500)  # Move the servo to the desired position
-        time.sleep(2)  # Keep it there for 2 seconds
-        pwm.set_servo_pulsewidth(servo, 1500)  # Center the servo again
-        print("That")
+    def locker1_open(self):
+        pwm.set_servo_pulsewidth(servo, 1500)
+        pwm.set_PWM_frequency(servo, 50)
+    
+    def locker1_close(self):
+        pwm.set_servo_pulsewidth(servo, 500)
+        pwm.set_PWM_frequency(servo, 50)
         
-    def locker2(self):
-        pwm.set_servo_pulsewidth(servo2, 1500)  # Center the servo
-        time.sleep(1)  # Give it some time to settle
-        pwm.set_PWM_frequency(servo2, 50)  # Set the frequency
-        pwm.set_servo_pulsewidth(servo2, 500)  # Move the servo to the desired position
-        time.sleep(2)  # Keep it there for 2 seconds
-        pwm.set_servo_pulsewidth(servo2, 1500)  # Center the servo again
+    def locker2_open(self):
+        pwm.set_servo_pulsewidth(servo2, 1500)
+        pwm.set_PWM_frequency(servo2, 50)
+    
+    def locker2_close(self):
+        pwm.set_servo_pulsewidth(servo2, 500)
+        pwm.set_PWM_frequency(servo2, 50)
             
     def toggle_camera(self):
         if self.camera_running:
