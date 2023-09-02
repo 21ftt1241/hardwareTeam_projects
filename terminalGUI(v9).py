@@ -13,7 +13,7 @@ import datetime
 
 # Replace these values with your database configuration
 db_config = {
-    "host": "192.168.43.8",
+    "host": "192.168.0.194",
     "user": "mus_pi",
     "password": "21ftt1241",
     "database": "db_test"
@@ -73,22 +73,16 @@ def distance():
 def updateLog(rentid):
     if connection.is_connected():
         cursor = connection.cursor()
-        
-        query = "SELECT log_message FROM log WHERE rent_id = %s"
-        cursor.execute(query, (rentid,))
-        
-        rows = cursor.fetchall()
-        for row in rows:
-            log_message = row[0]
-            current_time = datetime.datetime.now()
-            formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
-            new_log_message = f"{log_message},\nLocker Accessed: {formatted_time}"
+
+        current_time = datetime.datetime.now()
+        formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+        log_message = f"Locker Accessed: {formatted_time}"
             
-            update_query = "UPDATE log SET log_message = %s WHERE rent_id = %s"
-            cursor.execute(update_query, (new_log_message, rentid))
-            connection.commit()
+        insert_query = "INSERT INTO log (rent_id, log_message) VALUES (%s, %s)"
+        cursor.execute(insert_query, (rentid, log_message))
+        connection.commit()
             
-            print("Log updated:", new_log_message)
+        print("Log updated:", log_message)
         
         cursor.close()
 
@@ -171,7 +165,7 @@ class PassPage(tk.Frame):
         openbutton = Button(self, text="Open Locker", command=lambda: self.openLocker(self.rentid, self.otp))  # Pass the user input
         openbutton.place(relx=0.5, rely=0.55, anchor=CENTER)
         
-        self.qr_page_instance = QrPage(parent, controller)  # Create an instance of QrPage to access its method
+        self.qr_page_instance = QrPage(parent, controller)  # Create an instance of QrPage
         
         # ~ used to refresh the user input when going back to home
         def goHome():
@@ -198,30 +192,84 @@ class PassPage(tk.Frame):
             """
             cursor.execute(query, (rentid, otp))
             row = cursor.fetchone()
+            
+            locker_sens = distance()
+            print(locker_sens)
             if row:
                 lockerNum = row[8]
                 print("Opening locker: ", lockerNum)
                 
                 # Servo door opening code
                 if lockerNum == 105:
-                    print("Open 105")
-                    self.qr_page_instance.locker1_open()
-                    time.sleep(2)
-                    self.qr_page_instance.locker1_close()
+                    print("Valid user")
+                    print("Opening Locker", lockerNum)
+                    
+                    while True:
+                        while locker_sens <=15:
+                            locker_sens = distance()
+                            time.sleep(1)
+                            self.qr_page_instance.locker1_open()
+                    
+                            if locker_sens > 15:
+                                break
+                            
+                        while locker_sens >= 15:
+                            print("Door Open")
+                            locker_sens = distance()
+                            if locker_sens < 15:
+                                time.sleep(2)
+                                self.qr_page_instance.locker1_close()
+                                print("closing door")
+                                updateLog(rentid) #updates log
+                                break
+                        break
                     
                 elif lockerNum == 202:
-                    self.qr_page_instance.locker2_open()
-                    time.sleep(2)
-                    self.qr_page_instance.locker2_close()
+                    print("Valid user")
+                    print("Opening Locker", lockerNum)
                     
+                    while True:
+                        while locker_sens <=15:
+                            locker_sens = distance()
+                            time.sleep(1)
+                            self.locker2_open()
+                            if locker_sens > 15:
+                                break
+                            
+                        while locker_sens >= 15:
+                            print("Door Open")
+                            locker_sens = distance()
+                            if locker_sens < 15:
+                                time.sleep(2)
+                                self.locker2_close()
+                                print("closing door")
+                                updateLog(rentid) #updates log
+                                break
+                        break
             else:
                 print("Invalid rentid or Password")
-            cursor.close()
-            # ~ connection.close()
+                cursor.close()
+                # ~ connection.close()
         else:
             print("Database connection error")
             # ~ connection.close()
-
+    
+    # ~ def locker1_open(self):
+        # ~ pwm.set_servo_pulsewidth(servo, 1500)
+        # ~ pwm.set_PWM_frequency(servo, 50)
+    
+    # ~ def locker1_close(self):
+        # ~ pwm.set_servo_pulsewidth(servo, 500)
+        # ~ pwm.set_PWM_frequency(servo, 50)
+        
+    # ~ def locker2_open(self):
+        # ~ pwm.set_servo_pulsewidth(servo2, 1500)
+        # ~ pwm.set_PWM_frequency(servo2, 50)
+    
+    # ~ def locker2_close(self):
+        # ~ pwm.set_servo_pulsewidth(servo2, 500)
+        # ~ pwm.set_PWM_frequency(servo2, 50)
+        
 class QrPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent, bg="orange")
@@ -307,10 +355,11 @@ class QrPage(tk.Frame):
                                     time.sleep(2)
                                     self.locker1_close()
                                     print("closing door")
+                                    updateLog(rentid) #updates log
                                     break
                             break
                     
-                    # ~ Currently the sensor ius being shared for blocker1_close
+                    # ~ Currently the sensor is being shared for blocker1_close
                     # ~ fix it fast
                     if lockerNum == 202:
                         print("Valid user")
@@ -330,6 +379,7 @@ class QrPage(tk.Frame):
                                     time.sleep(2)
                                     self.locker2_close()
                                     print("closing door")
+                                    updateLog(rentid) #updates log
                                     break
                             break
                         
