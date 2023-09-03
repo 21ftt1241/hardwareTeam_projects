@@ -7,7 +7,7 @@ import time
 GPIO.setmode(GPIO.BCM)
 
 # Pin numbers
-servo = 18
+servo = 16
 
 # Initialize pigpio
 pwm = pigpio.pi()
