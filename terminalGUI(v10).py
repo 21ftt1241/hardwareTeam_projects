@@ -42,6 +42,17 @@ GPIO_ECHO = 24
 GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
 GPIO.setup(GPIO_ECHO, GPIO.IN)
 
+
+# Define a video capture object
+vid = cv2.VideoCapture(0)
+
+# Declare the width and height in variables
+width, height = 640, 480
+
+# Set the width and height
+vid.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+vid.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+
 def distance():
     # set Trigger to HIGH
     GPIO.output(GPIO_TRIGGER, True)
@@ -86,15 +97,21 @@ def updateLog(rentid):
         
         cursor.close()
 
-# Define a video capture object
-vid = cv2.VideoCapture(0)
+def locker1_open():
+    pwm.set_servo_pulsewidth(servo, 1500)
+    pwm.set_PWM_frequency(servo, 50)
 
-# Declare the width and height in variables
-width, height = 640, 480
+def locker1_close():
+    pwm.set_servo_pulsewidth(servo, 500)
+    pwm.set_PWM_frequency(servo, 50)
+    
+def locker2_open():
+    pwm.set_servo_pulsewidth(servo2, 1500)
+    pwm.set_PWM_frequency(servo2, 50)
 
-# Set the width and height
-vid.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-vid.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+def locker2_close():
+    pwm.set_servo_pulsewidth(servo2, 500)
+    pwm.set_PWM_frequency(servo2, 50)
 
 # ~ basically holds all the other page and manage the page swap
 class MainFrame(tk.Tk):
@@ -208,7 +225,7 @@ class PassPage(tk.Frame):
                         while locker_sens <=15:
                             locker_sens = distance()
                             time.sleep(1)
-                            self.qr_page_instance.locker1_open()
+                            locker1_open()
                             if locker_sens > 15:
                                 break
                             
@@ -217,7 +234,7 @@ class PassPage(tk.Frame):
                             locker_sens = distance()
                             if locker_sens < 15:
                                 time.sleep(2)
-                                self.qr_page_instance.locker1_close()
+                                locker1_close()
                                 print("closing door")
                                 updateLog(rentid) #updates log
                                 break
@@ -231,7 +248,7 @@ class PassPage(tk.Frame):
                         while locker_sens <=15:
                             locker_sens = distance()
                             time.sleep(1)
-                            self.qr_page_instance.locker2_open()
+                            locker2_open()
                             if locker_sens > 15:
                                 break
                             
@@ -240,7 +257,7 @@ class PassPage(tk.Frame):
                             locker_sens = distance()
                             if locker_sens < 15:
                                 time.sleep(2)
-                                self.qr_page_instance.locker2_close()
+                                locker2_close()
                                 print("closing door")
                                 updateLog(rentid) #updates log
                                 break
@@ -253,21 +270,6 @@ class PassPage(tk.Frame):
             print("Database connection error")
             # ~ connection.close()
     
-    # ~ def locker1_open(self):
-        # ~ pwm.set_servo_pulsewidth(servo, 1500)
-        # ~ pwm.set_PWM_frequency(servo, 50)
-    
-    # ~ def locker1_close(self):
-        # ~ pwm.set_servo_pulsewidth(servo, 500)
-        # ~ pwm.set_PWM_frequency(servo, 50)
-        
-    # ~ def locker2_open(self):
-        # ~ pwm.set_servo_pulsewidth(servo2, 1500)
-        # ~ pwm.set_PWM_frequency(servo2, 50)
-    
-    # ~ def locker2_close(self):
-        # ~ pwm.set_servo_pulsewidth(servo2, 500)
-        # ~ pwm.set_PWM_frequency(servo2, 50)
         
 class QrPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -343,7 +345,7 @@ class QrPage(tk.Frame):
                             while locker_sens <=15:
                                 locker_sens = distance()
                                 time.sleep(1)
-                                self.locker1_open()
+                                locker1_open()
                                 if locker_sens > 15:
                                     break
                             
@@ -352,7 +354,7 @@ class QrPage(tk.Frame):
                                 locker_sens = distance()
                                 if locker_sens < 15:
                                     time.sleep(2)
-                                    self.locker1_close()
+                                    locker1_close()
                                     print("closing door")
                                     updateLog(rentid) #updates log
                                     break
@@ -367,7 +369,7 @@ class QrPage(tk.Frame):
                             while locker_sens <=15:
                                 locker_sens = distance()
                                 time.sleep(1)
-                                self.locker2_open()
+                                locker2_open()
                                 if locker_sens > 15:
                                     break
                             
@@ -376,7 +378,7 @@ class QrPage(tk.Frame):
                                 locker_sens = distance()
                                 if locker_sens < 15:
                                     time.sleep(2)
-                                    self.locker2_close()
+                                    locker2_close()
                                     print("closing door")
                                     updateLog(rentid) #updates log
                                     break
@@ -397,22 +399,6 @@ class QrPage(tk.Frame):
         else:
             print("Camera shutting down")
             self.close_camera()
-    
-    def locker1_open(self):
-        pwm.set_servo_pulsewidth(servo, 1500)
-        pwm.set_PWM_frequency(servo, 50)
-    
-    def locker1_close(self):
-        pwm.set_servo_pulsewidth(servo, 500)
-        pwm.set_PWM_frequency(servo, 50)
-        
-    def locker2_open(self):
-        pwm.set_servo_pulsewidth(servo2, 1500)
-        pwm.set_PWM_frequency(servo2, 50)
-    
-    def locker2_close(self):
-        pwm.set_servo_pulsewidth(servo2, 500)
-        pwm.set_PWM_frequency(servo2, 50)
             
     def toggle_camera(self):
         if self.camera_running:
