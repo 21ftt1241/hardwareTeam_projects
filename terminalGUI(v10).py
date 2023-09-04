@@ -35,8 +35,8 @@ pwm.set_mode(servo2, pigpio.OUTPUT)
 GPIO.setmode(GPIO.BCM)
  
 #set GPIO Pins
-GPIO_TRIGGER = 18
-GPIO_ECHO = 24
+GPIO_TRIGGER = 24
+GPIO_ECHO = 18
  
 #set GPIO direction (IN / OUT)
 GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
@@ -84,12 +84,11 @@ def distance():
 def updateLog(rentid):
     if connection.is_connected():
         cursor = connection.cursor()
-
         current_time = datetime.datetime.now()
         formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
         log_message = f"Locker Accessed: {formatted_time}"
             
-        insert_query = "INSERT INTO log (rent_id, log_message) VALUES (%s, %s)"
+        insert_query = "INSERT INTO log (log_id, rent_id, log_message) VALUES (NULL, %s, %s)"
         cursor.execute(insert_query, (rentid, log_message))
         connection.commit()
             
@@ -163,13 +162,13 @@ class PassPage(tk.Frame):
         Frame.__init__(self, parent, bg="orange")
         self.controller = controller
         self.controller.geometry("1024x600")
-        label = Label(self, text="Input Rent ID and OTp here")
+        label = Label(self, text="Input Locker Number and OTP here")
         label.pack(pady=10, padx=10)
 
-        label2 = Label(self, text="Rent ID", bg="orange")
+        label2 = Label(self, text="Locker Num", bg="orange")
         label2.place(relx=0.5, rely=0.25, anchor=CENTER)
-        self.rentid = tk.StringVar()  # Make rentid a class attribute
-        idEntry = tk.Entry(self, textvariable=self.rentid)
+        self.lockernum = tk.StringVar()  # Make lockernum a class attribute
+        idEntry = tk.Entry(self, textvariable=self.lockernum)
         idEntry.place(relx=0.5, rely=0.30, anchor=CENTER)
         idEntry.focus()
 
@@ -179,7 +178,7 @@ class PassPage(tk.Frame):
         otpEntry = tk.Entry(self, textvariable=self.otp, show="*")
         otpEntry.place(relx=0.5, rely=0.45, anchor=CENTER)
     
-        openbutton = Button(self, text="Open Locker", command=lambda: self.openLocker(self.rentid, self.otp))  # Pass the user input
+        openbutton = Button(self, text="Open Locker", command=lambda: self.openLocker(self.lockernum, self.otp))  # Pass the user input
         openbutton.place(relx=0.5, rely=0.55, anchor=CENTER)
         
         self.qr_page_instance = QrPage(parent, controller)  # Create an instance of QrPage
@@ -194,21 +193,22 @@ class PassPage(tk.Frame):
         homebutton = Button(self, text="Back to Home", command=goHome)
         homebutton.place(relx=0.5, rely=0.8, anchor=CENTER)
         
-    def openLocker(self, rentid, otp):
-        rentid = rentid.get()
+    def openLocker(self, lockernum, otp):
+        lockernum = lockernum.get()
         otp = otp.get()
         
-        # ~ check the validity of rent id and OTP)
+        # ~ check the validity of Locker Num and OTP)
         if connection.is_connected():
             cursor = connection.cursor()
             query = """
-                SELECT r.*, l.locker_number 
+                SELECT r.*, l.locker_number
                 FROM rentdetail r
                 INNER JOIN locker l ON r.locker_id = l.locker_id
-                WHERE r.rent_id = %s AND r.locker_otp = %s
-            """
-            cursor.execute(query, (rentid, otp))
+                WHERE l.locker_number = %s AND r.locker_otp = %s
+                """
+            cursor.execute(query, (lockernum, otp))
             row = cursor.fetchone()
+            rentid = row[0]
             
             locker_sens = distance()
             print(locker_sens)
@@ -222,17 +222,18 @@ class PassPage(tk.Frame):
                     print("Opening Locker", lockerNum)
                     
                     while True:
-                        while locker_sens <=15:
+                        while locker_sens <=10:
                             locker_sens = distance()
                             time.sleep(1)
                             locker1_open()
-                            if locker_sens > 15:
+                            if locker_sens > 10:
                                 break
                             
-                        while locker_sens >= 15:
+                        while locker_sens >= 10:
                             print("Door Open")
+                            print(locker_sens)
                             locker_sens = distance()
-                            if locker_sens < 15:
+                            if locker_sens < 10:
                                 time.sleep(2)
                                 locker1_close()
                                 print("closing door")
@@ -245,17 +246,17 @@ class PassPage(tk.Frame):
                     print("Opening Locker", lockerNum)
                     
                     while True:
-                        while locker_sens <=15:
+                        while locker_sens <=10:
                             locker_sens = distance()
                             time.sleep(1)
                             locker2_open()
-                            if locker_sens > 15:
+                            if locker_sens > 10:
                                 break
                             
-                        while locker_sens >= 15:
+                        while locker_sens >= 10:
                             print("Door Open")
                             locker_sens = distance()
-                            if locker_sens < 15:
+                            if locker_sens < 10:
                                 time.sleep(2)
                                 locker2_close()
                                 print("closing door")
@@ -263,7 +264,7 @@ class PassPage(tk.Frame):
                                 break
                         break
             else:
-                print("Invalid rentid or Password")
+                print("Invalid Locker Number or Password")
                 cursor.close()
                 # ~ connection.close()
         else:
@@ -325,34 +326,35 @@ class QrPage(tk.Frame):
             print(locker_sens)
             if decoded_objects:
                 data = decoded_objects[0].data.decode('utf-8')
-                rentid, otp = data.split(',')
+                lockernum, otp = data.split(',')
 
                 cursor = connection.cursor()
                 query = """
-                    SELECT r.*, l.locker_number 
+                    SELECT r.*, l.locker_number
                     FROM rentdetail r
                     INNER JOIN locker l ON r.locker_id = l.locker_id
-                    WHERE r.rent_id = %s AND r.locker_otp = %s
+                    WHERE l.locker_number = %s AND r.locker_otp = %s
                 """
-                cursor.execute(query, (rentid, otp))
+                cursor.execute(query, (lockernum, otp))
                 row = cursor.fetchone()
+                rentid = row[0]
                 if row:
                     lockerNum = row[7]
                     if lockerNum == 105:
                         print("Valid user")
                         print("Opening Locker", lockerNum)
                         while True:
-                            while locker_sens <=15:
+                            while locker_sens <=10:
                                 locker_sens = distance()
                                 time.sleep(1)
                                 locker1_open()
-                                if locker_sens > 15:
+                                if locker_sens > 10:
                                     break
                             
-                            while locker_sens >= 15:
+                            while locker_sens >= 10:
                                 print("Door Open")
                                 locker_sens = distance()
-                                if locker_sens < 15:
+                                if locker_sens < 10:
                                     time.sleep(2)
                                     locker1_close()
                                     print("closing door")
@@ -366,17 +368,17 @@ class QrPage(tk.Frame):
                         print("Valid user")
                         print("Opening Locker", lockerNum)
                         while True:
-                            while locker_sens <=15:
+                            while locker_sens <=10:
                                 locker_sens = distance()
                                 time.sleep(1)
                                 locker2_open()
-                                if locker_sens > 15:
+                                if locker_sens > 10:
                                     break
                             
-                            while locker_sens >= 15:
+                            while locker_sens >= 10:
                                 print("Door Open")
                                 locker_sens = distance()
-                                if locker_sens < 15:
+                                if locker_sens < 10:
                                     time.sleep(2)
                                     locker2_close()
                                     print("closing door")
