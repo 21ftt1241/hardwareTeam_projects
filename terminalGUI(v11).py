@@ -325,12 +325,17 @@ class QrPage(tk.Frame):
                 row = cursor.fetchone()
                 rentid = row[0]
                 lockerNum = row[7]
+                # ~ code to open and close the door
                 if lockerNum in lockerNumArr:
                     servoVal = lockerNumArr[lockerNum]
+                    lockerSensor = locker_sens[lockerNum]
+                    echo_value = lockerSensor["Echo"]
+                    trig_value = lockerSensor["Trig"]
                     while True:
+                        door_sens = distance(echo_value, trig_value)
                         time.sleep(0.5)
                         while door_sens <=10:
-                            door_sens = distance()
+                            door_sens = distance(echo_value, trig_value)
                             time.sleep(1)
                             locker_open(servoVal)
                             if door_sens > 10:
@@ -340,7 +345,7 @@ class QrPage(tk.Frame):
                             time.sleep(0.5)
                             print("Door Open")
                             print(door_sens)
-                            door_sens = distance()
+                            door_sens = distance(echo_value, trig_value)
                             if door_sens < 10:
                                 time.sleep(2)
                                 locker_close(servoVal)
