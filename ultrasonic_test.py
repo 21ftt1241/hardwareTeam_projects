@@ -17,7 +17,7 @@ def distance():
     GPIO.output(GPIO_TRIGGER, True)
  
     # set Trigger after 0.01ms to LOW
-    time.sleep(0.00001)
+    time.sleep(0.01)
     GPIO.output(GPIO_TRIGGER, False)
  
     StartTime = time.time()
@@ -43,6 +43,7 @@ if __name__ == '__main__':
     try:
         while True:
                 dist = distance()
+                time.sleep(0.5)
                 print ("Measured Distance = %.1f cm" % dist)
                 if dist >= 8:
                         print("Locker Open")

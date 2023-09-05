@@ -1,30 +1,15 @@
-import cv2
+# Create a dictionary to store the value pairs
+value_pairs = {
+    "105": "12",
+    "202": "16"
+}
 
-# set up camera object
-cap = cv2.VideoCapture(0)
+# Get user input
+inputNum = input("Enter a number (105 or 202): ")
 
-# QR code detection object
-detector = cv2.QRCodeDetector()
-
-while True:
-    # get the image
-    _, img = cap.read()
-    # get bounding box coords and data
-    data, bbox, _ = detector.detectAndDecode(img)
-    
-    # if there is a bounding box, draw one, along with the data
-    if(bbox is not None):
-        for i in range(len(bbox)):
-            cv2.line(img, tuple(bbox[i][0]), tuple(bbox[(i+1) % len(bbox)][0]), color=(255,
-                     0, 255), thickness=2)
-        cv2.putText(img, data, (int(bbox[0][0][0]), int(bbox[0][0][1]) - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (0, 255, 0), 2)
-        if data:
-            print("data found: ", data)
-    # display the image preview
-    cv2.imshow("code detector", img)
-    if(cv2.waitKey(1) == ord("q")):
-        break
-# free camera object and exit
-cap.release()
-cv2.destroyAllWindows()
+# Check if the input corresponds to one of the pairs
+if inputNum in value_pairs:
+    corresponding_value = value_pairs[inputNum]
+    print(f"Number {inputNum} corresponds to {corresponding_value}.")
+else:
+    print(f"Number {inputNum} is not found in the pairs.")

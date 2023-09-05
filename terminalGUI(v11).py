@@ -13,8 +13,7 @@ import datetime
 
 # Replace these values with your database configuration
 db_config = {
-    # ~ "host": "192.168.0.188",
-    "host": "192.168.43.8",
+    "host": "192.168.0.188",
     "user": "mus_pi",
     "password": "21ftt1241",
     "database": "db_test"
@@ -24,13 +23,19 @@ db_config = {
 connection = mysql.connector.connect(**db_config)
 
 # Initialize servo IO pins
-servo = 12
+servo1 = 12
 servo2 = 16
 
 # Setup pigpio and frequency of servo(s)
 pwm = pigpio.pi()
-pwm.set_mode(servo, pigpio.OUTPUT)
+pwm.set_mode(servo1, pigpio.OUTPUT)
 pwm.set_mode(servo2, pigpio.OUTPUT)
+
+# ~ locker number : servo pin
+lockerNumArr = {
+    105:12,
+    202:16
+}
 
 #GPIO Mode (BOARD / BCM)
 GPIO.setmode(GPIO.BCM)
@@ -96,22 +101,14 @@ def updateLog(rentid):
         print("Log updated:", log_message)
         
         cursor.close()
-
-def locker1_open():
-    pwm.set_servo_pulsewidth(servo, 1500)
-    pwm.set_PWM_frequency(servo, 50)
-
-def locker1_close():
-    pwm.set_servo_pulsewidth(servo, 500)
-    pwm.set_PWM_frequency(servo, 50)
+        
+def locker_open(servoVal):
+    pwm.set_servo_pulsewidth(servoVal, 1500)
+    pwm.set_PWM_frequency(servoVal, 50)
     
-def locker2_open():
-    pwm.set_servo_pulsewidth(servo2, 1500)
-    pwm.set_PWM_frequency(servo2, 50)
-
-def locker2_close():
-    pwm.set_servo_pulsewidth(servo2, 500)
-    pwm.set_PWM_frequency(servo2, 50)
+def locker_close(servoVal):
+    pwm.set_servo_pulsewidth(servoVal, 500)
+    pwm.set_PWM_frequency(servoVal, 50)
 
 # ~ basically holds all the other page and manage the page swap
 class MainFrame(tk.Tk):
@@ -209,65 +206,42 @@ class PassPage(tk.Frame):
                 """
             cursor.execute(query, (lockernum, otp))
             row = cursor.fetchone()
+            
+            # ~ assign rentid to a var
             rentid = row[0]
             
-            locker_sens = distance()
-            print(locker_sens)
-            if row:
-                lockerNum = row[7]
-                print("Opening locker: ", lockerNum)
-                
-                # Servo door opening code
-                if lockerNum == 105:
-                    print("Valid user")
-                    print("Opening Locker", lockerNum)
-                    
-                    while True:
-                        while locker_sens <=10:
-                            locker_sens = distance()
-                            time.sleep(1)
-                            locker1_open()
-                            if locker_sens > 10:
-                                break
-                            
-                        while locker_sens >= 10:
-                            print("Door Open")
-                            print(locker_sens)
-                            locker_sens = distance()
-                            if locker_sens < 10:
-                                time.sleep(2)
-                                locker1_close()
-                                print("closing door")
-                                updateLog(rentid) #updates log
-                                break
-                        break
-                    
-                elif lockerNum == 202:
-                    print("Valid user")
-                    print("Opening Locker", lockerNum)
-                    
-                    while True:
-                        while locker_sens <=10:
-                            locker_sens = distance()
-                            time.sleep(1)
-                            locker2_open()
-                            if locker_sens > 10:
-                                break
-                            
-                        while locker_sens >= 10:
-                            print("Door Open")
-                            locker_sens = distance()
-                            if locker_sens < 10:
-                                time.sleep(2)
-                                locker2_close()
-                                print("closing door")
-                                updateLog(rentid) #updates log
-                                break
-                        break
+            # ~ assign locker number to a var
+            lockerNum = row[7]
+            
+            door_sens = distance()
+            
+            # ~ code to open and close the door
+            if lockerNum in lockerNumArr:
+                servoVal = lockerNumArr[lockerNum]
+                while True:
+                    time.sleep(0.5)
+                    while door_sens <=10:
+                        door_sens = distance()
+                        time.sleep(1)
+                        locker_open(servoVal)
+                        if door_sens > 10:
+                            break
+                        
+                    while door_sens >= 10:
+                        time.sleep(0.5)
+                        print("Door Open")
+                        print(door_sens)
+                        door_sens = distance()
+                        if door_sens < 10:
+                            time.sleep(2)
+                            locker_close(servoVal)
+                            print("closing door")
+                            updateLog(rentid) #updates log
+                            break
+                    break
             else:
                 print("Invalid Locker Number or Password")
                 cursor.close()
-                # ~ connection.close()
         else:
             print("Database connection error")
             # ~ connection.close()
@@ -323,11 +297,11 @@ class QrPage(tk.Frame):
             self.label_widget.photo_image = photo_image
             self.label_widget.configure(image=photo_image)
             
-            locker_sens = distance()
-            print(locker_sens)
+            door_sens = distance()
+            # ~ print(locker_sens)
             if decoded_objects:
                 data = decoded_objects[0].data.decode('utf-8')
-                lockernum, otp = data.split(',')
+                lockerNum, otp = data.split(',')
 
                 cursor = connection.cursor()
                 query = """
@@ -336,56 +310,33 @@ class QrPage(tk.Frame):
                     INNER JOIN locker l ON r.locker_id = l.locker_id
                     WHERE l.locker_number = %s AND r.locker_otp = %s
                 """
-                cursor.execute(query, (lockernum, otp))
+                cursor.execute(query, (lockerNum, otp))
                 row = cursor.fetchone()
                 rentid = row[0]
-                if row:
-                    lockerNum = row[7]
-                    if lockerNum == 105:
-                        print("Valid user")
-                        print("Opening Locker", lockerNum)
-                        while True:
-                            while locker_sens <=10:
-                                locker_sens = distance()
-                                time.sleep(1)
-                                locker1_open()
-                                if locker_sens > 10:
-                                    break
+                lockerNum = row[7]
+                if lockerNum in lockerNumArr:
+                    servoVal = lockerNumArr[lockerNum]
+                    while True:
+                        time.sleep(0.5)
+                        while door_sens <=10:
+                            door_sens = distance()
+                            time.sleep(1)
+                            locker_open(servoVal)
+                            if door_sens > 10:
+                                break
                             
-                            while locker_sens >= 10:
-                                print("Door Open")
-                                locker_sens = distance()
-                                if locker_sens < 10:
-                                    time.sleep(2)
-                                    locker1_close()
-                                    print("closing door")
-                                    updateLog(rentid) #updates log
-                                    break
-                            break
-                    
-                    # ~ Currently the sensor is being shared for blocker1_close
-                    # ~ fix it fast
-                    if lockerNum == 202:
-                        print("Valid user")
-                        print("Opening Locker", lockerNum)
-                        while True:
-                            while locker_sens <=10:
-                                locker_sens = distance()
-                                time.sleep(1)
-                                locker2_open()
-                                if locker_sens > 10:
-                                    break
-                            
-                            while locker_sens >= 10:
-                                print("Door Open")
-                                locker_sens = distance()
-                                if locker_sens < 10:
-                                    time.sleep(2)
-                                    locker2_close()
-                                    print("closing door")
-                                    updateLog(rentid) #updates log
-                                    break
-                            break
+                        while door_sens >= 10:
+                            time.sleep(0.5)
+                            print("Door Open")
+                            print(door_sens)
+                            door_sens = distance()
+                            if door_sens < 10:
+                                time.sleep(2)
+                                locker_close(servoVal)
+                                print("closing door")
+                                updateLog(rentid) #updates log
+                                break
+                        break
                         
                 else:
                     print("Invalid QR code data")
