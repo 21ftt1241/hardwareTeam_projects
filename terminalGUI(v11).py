@@ -37,6 +37,7 @@ lockerNumArr = {
     202:16
 }
 
+
 #GPIO Mode (BOARD / BCM)
 GPIO.setmode(GPIO.BCM)
  
@@ -47,6 +48,14 @@ GPIO_ECHO = 18
 #set GPIO direction (IN / OUT)
 GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
 GPIO.setup(GPIO_ECHO, GPIO.IN)
+
+# ~ trig1:echo1
+locker_sens = {
+    105: {
+    "Trig": 24,
+    "Echo": 18
+    }
+}
 
 
 # Define a video capture object
@@ -59,23 +68,23 @@ width, height = 640, 480
 vid.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 vid.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-def distance():
+def distance(echo_value, trig_value):
     # set Trigger to HIGH
-    GPIO.output(GPIO_TRIGGER, True)
+    GPIO.output(trig_value, True)
  
     # set Trigger after 0.01ms to LOW
     time.sleep(0.00001)
-    GPIO.output(GPIO_TRIGGER, False)
+    GPIO.output(trig_value, False)
  
     StartTime = time.time()
     StopTime = time.time()
  
     # save StartTime
-    while GPIO.input(GPIO_ECHO) == 0:
+    while GPIO.input(echo_value) == 0:
         StartTime = time.time()
  
     # save time of arrival
-    while GPIO.input(GPIO_ECHO) == 1:
+    while GPIO.input(echo_value) == 1:
         StopTime = time.time()
  
     # time difference between start and arrival
@@ -213,15 +222,17 @@ class PassPage(tk.Frame):
             # ~ assign locker number to a var
             lockerNum = row[7]
             
-            door_sens = distance()
-            
             # ~ code to open and close the door
             if lockerNum in lockerNumArr:
                 servoVal = lockerNumArr[lockerNum]
+                lockerSensor = locker_sens[lockerNum]
+                echo_value = lockerSensor["Echo"]
+                trig_value = lockerSensor["Trig"]
                 while True:
+                    door_sens = distance(echo_value, trig_value)
                     time.sleep(0.5)
                     while door_sens <=10:
-                        door_sens = distance()
+                        door_sens = distance(echo_value, trig_value)
                         time.sleep(1)
                         locker_open(servoVal)
                         if door_sens > 10:
@@ -231,7 +242,7 @@ class PassPage(tk.Frame):
                         time.sleep(0.5)
                         print("Door Open")
                         print(door_sens)
-                        door_sens = distance()
+                        door_sens = distance(echo_value, trig_value)
                         if door_sens < 10:
                             time.sleep(2)
                             locker_close(servoVal)
