@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import *
 from functools import partial
+from tkinter import messagebox
 import cv2
 from PIL import Image, ImageTk
 import time
@@ -134,15 +135,30 @@ def genPass(lockerNum):
         connection.commit()
         
         cursor.close()
+        
+def timer(door_sens):
+    start_time = time.time()
+    while True:
+        elapsed_time = time.time() - start_time
+        if door_sens >= 10:
+            if elapsed_time >= 10:
+                messagebox.showerror("BEWARE", "CLOSE THE LOCKER DOOR WHEN NOT IN USE")
+                break
+            else:
+                print(elapsed_time)
+                break
+            print(door_sens)
     
         
 def locker_open(servoVal):
     pwm.set_servo_pulsewidth(servoVal, 500)
     pwm.set_PWM_frequency(servoVal, 50)
+    print("Servo lock open")
     
 def locker_close(servoVal):
     pwm.set_servo_pulsewidth(servoVal, 1500)
     pwm.set_PWM_frequency(servoVal, 50)
+    print("Servo lock close")
     
 
 def locker_checker(lockernum, otp):
@@ -160,6 +176,14 @@ def locker_checker(lockernum, otp):
             """
             cursor.execute(query, (lockernum, otp))
             row = cursor.fetchone()
+            print(row)
+            
+            if row is None:
+                print("Invalid Data")
+                messagebox.showerror("Invalid Data", "The Locker Number / OTP is Invalid")
+                return
+            print("Data is valid")
+                
             
             # Assign rentid to a var
             rentid = row[0]
@@ -180,12 +204,15 @@ def locker_checker(lockernum, otp):
                         door_sens = distance(echo_value, trig_value)
                         time.sleep(1)
                         locker_open(servoVal)
+                        print("Locker door closed")
                         if door_sens > 10:
                             break
                         
                     while door_sens >= 10:
                         time.sleep(0.5)
                         door_sens = distance(echo_value, trig_value)
+                        print("locker door open")
+                        # ~ timer(door_sens)
                         if door_sens < 10:
                             time.sleep(2)
                             locker_close(servoVal)
@@ -195,6 +222,9 @@ def locker_checker(lockernum, otp):
                     break
             else:
                 print("Invalid Data")
+                messagebox.showerror("Locker unavailable", "Locker is not available")
+                return
+                
             rentid = 0
             lockernNum = 0
             cursor.close()
