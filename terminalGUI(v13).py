@@ -9,14 +9,16 @@ from pyzbar.pyzbar import decode
 import pigpio
 import RPi.GPIO as GPIO
 import datetime
+import random
 
 
 # Replace these values with your database configuration
+#Dont open this when streaming
 db_config = {
-    "host": "192.168.0.188",
-    "user": "mus_pi",
-    "password": "21ftt1241",
-    "database": "db_test"
+    "host": "167.172.75.119",
+    "user": "hardware-Team",
+    "password": "hardware123",
+    "database": "drop_n_go"
 }
 
 # Establish a connection to the database
@@ -33,10 +35,9 @@ pwm.set_mode(servo2, pigpio.OUTPUT)
 
 # ~ locker number : servo pin
 lockerNumArr = {
-    "MG1":17,
-    "MG5":27
+    "MG1":12,
+    "MG5":16
 }
-
 
 #GPIO Mode (BOARD / BCM)
 GPIO.setmode(GPIO.BCM)
@@ -68,10 +69,6 @@ locker_sens = {
     "Echo": 24
     }
 }
-
-# ~ item_sens = {
-    
-# ~ }
 
 # Define a video capture object
 vid = cv2.VideoCapture(0)
@@ -126,15 +123,27 @@ def updateLog(rentid):
         
         cursor.close()
         
-def locker_open(servoVal):
-    pwm.set_servo_pulsewidth(servoVal, 1500)
-    pwm.set_PWM_frequency(servoVal, 50)
+def genPass(lockerNum):
+    newPass = random.randint(1000, 9999)
+    print("genPass", lockerNum)
+    print(newPass)
+    if connection.is_connected():
+        cursor = connection.cursor()
+        update_query = "UPDATE locker SET locker_otp = %s WHERE locker_number = %s"
+        cursor.execute(update_query, (newPass, lockerNum))
+        connection.commit()
+        
+        cursor.close()
     
-def locker_close(servoVal):
+        
+def locker_open(servoVal):
     pwm.set_servo_pulsewidth(servoVal, 500)
     pwm.set_PWM_frequency(servoVal, 50)
     
-# ...
+def locker_close(servoVal):
+    pwm.set_servo_pulsewidth(servoVal, 1500)
+    pwm.set_PWM_frequency(servoVal, 50)
+    
 
 def locker_checker(lockernum, otp):
     try:
@@ -151,7 +160,6 @@ def locker_checker(lockernum, otp):
             """
             cursor.execute(query, (lockernum, otp))
             row = cursor.fetchone()
-            print(row)
             
             # Assign rentid to a var
             rentid = row[0]
@@ -177,14 +185,12 @@ def locker_checker(lockernum, otp):
                         
                     while door_sens >= 10:
                         time.sleep(0.5)
-                        print("Door Open")
-                        print(door_sens)
                         door_sens = distance(echo_value, trig_value)
                         if door_sens < 10:
                             time.sleep(2)
                             locker_close(servoVal)
-                            print("closing door")
                             updateLog(rentid)  # Updates log
+                            genPass(lockerNum)
                             break
                     break
             else:
@@ -202,10 +208,6 @@ def locker_checker(lockernum, otp):
         if 'new_connection' in locals() and new_connection.is_connected():
             new_connection.close()
 
-# ...
-
-        
-    
 
 # ~ basically holds all the other page and manage the page swap
 class MainFrame(tk.Tk):
@@ -250,7 +252,6 @@ class StartPage(tk.Frame):
         self.button2 = Button(button_frame, text="Use QR Code", width=35, height=20,
                               command=lambda: controller.show_frame(QrPage))
         self.button2.place(relx=0.65, rely=0.5, anchor=CENTER)
-
 
 class PassPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -364,15 +365,10 @@ class QrPage(tk.Frame):
                 cursor.execute(query, (lockernum, otp))
                 row = cursor.fetchone()
                 print(row)
-                # ~ rentid = row[0]
-                # ~ lockernum = row[1]
                 # ~ code to open and close the door
                 locker_checker(lockernum, otp)
                         
-                # ~ else:
-                    # ~ print("Invalid QR code data")
                 self.close_camera()
-                # ~ vid.grab()
             
             else:
                 print("No Data")
