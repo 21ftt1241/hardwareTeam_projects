@@ -18,10 +18,10 @@ class DatabaseApp:
         if self.connection is None:
             try:
                 db_config = {
-                    "host": "192.168.0.188",
-                    "user": "mus_pi",
-                    "password": "21ftt1241",
-                    "database": "pi_test"
+                    "host": "167.172.75.119",
+                    "user": "hardware-Team",
+                    "password": "hardware123",
+                    "database": "drop_n_go"
                 }
                 self.connection = mysql.connector.connect(**db_config)
                 print("Connected to the database")

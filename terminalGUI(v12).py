@@ -34,7 +34,7 @@ pwm.set_mode(servo2, pigpio.OUTPUT)
 # ~ locker number : servo pin
 lockerNumArr = {
     "MG1":17,
-    "MG3":27
+    "MG5":27
 }
 
 
@@ -63,7 +63,7 @@ locker_sens = {
     "Trig": 23,
     "Echo": 18
     },
-    "MG3":{
+    "MG5":{
     "Trig": 25,
     "Echo": 24
     }
@@ -133,6 +133,79 @@ def locker_open(servoVal):
 def locker_close(servoVal):
     pwm.set_servo_pulsewidth(servoVal, 500)
     pwm.set_PWM_frequency(servoVal, 50)
+    
+# ...
+
+def locker_checker(lockernum, otp):
+    try:
+        # Establish a new connection for this function
+        new_connection = mysql.connector.connect(**db_config)
+        
+        if new_connection.is_connected():
+            cursor = new_connection.cursor()
+            query = """
+                SELECT r.rent_id, l.locker_number
+                FROM rentdetail r
+                INNER JOIN locker l ON r.locker_id = l.locker_id
+                WHERE l.locker_number = %s AND l.locker_otp = %s
+            """
+            cursor.execute(query, (lockernum, otp))
+            row = cursor.fetchone()
+            print(row)
+            
+            # Assign rentid to a var
+            rentid = row[0]
+            
+            # Assign locker number to a var
+            lockerNum = row[1]
+            
+            # Code to open and close the door
+            if lockerNum in lockerNumArr:
+                servoVal = lockerNumArr[lockerNum]
+                lockerSensor = locker_sens[lockerNum]
+                echo_value = lockerSensor["Echo"]
+                trig_value = lockerSensor["Trig"]
+                while True:
+                    door_sens = distance(echo_value, trig_value)
+                    time.sleep(0.5)
+                    while door_sens <= 10:
+                        door_sens = distance(echo_value, trig_value)
+                        time.sleep(1)
+                        locker_open(servoVal)
+                        if door_sens > 10:
+                            break
+                        
+                    while door_sens >= 10:
+                        time.sleep(0.5)
+                        print("Door Open")
+                        print(door_sens)
+                        door_sens = distance(echo_value, trig_value)
+                        if door_sens < 10:
+                            time.sleep(2)
+                            locker_close(servoVal)
+                            print("closing door")
+                            updateLog(rentid)  # Updates log
+                            break
+                    break
+            else:
+                print("Invalid Data")
+            rentid = 0
+            lockernNum = 0
+            cursor.close()
+            
+    except mysql.connector.Error as err:
+        print(f"Database error: {err}")
+    finally:
+        # Close the cursor and connection, even if an exception occurs
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'new_connection' in locals() and new_connection.is_connected():
+            new_connection.close()
+
+# ...
+
+        
+    
 
 # ~ basically holds all the other page and manage the page swap
 class MainFrame(tk.Tk):
@@ -219,59 +292,10 @@ class PassPage(tk.Frame):
         lockernum = lockernum.get()
         otp = otp.get()
         
+        locker_checker(lockernum, otp)
+        
         # ~ check the validity of Locker Num and OTP)
-        if connection.is_connected():
-            cursor = connection.cursor()
-            query = """
-                SELECT r.rent_id, l.locker_number
-                FROM rentdetail r
-                INNER JOIN locker l ON r.locker_id = l.locker_id
-                WHERE l.locker_number = %s AND l.locker_otp = %s
-                """
-            cursor.execute(query, (lockernum, otp))
-            row = cursor.fetchone()
-            print(row)
-            
-            # ~ assign rentid to a var
-            rentid = row[0]
-            
-            # ~ assign locker number to a var
-            lockerNum = row[1]
-            
-            # ~ code to open and close the door
-            if lockerNum in lockerNumArr:
-                servoVal = lockerNumArr[lockerNum]
-                lockerSensor = locker_sens[lockerNum]
-                echo_value = lockerSensor["Echo"]
-                trig_value = lockerSensor["Trig"]
-                while True:
-                    door_sens = distance(echo_value, trig_value)
-                    time.sleep(0.5)
-                    while door_sens <=10:
-                        door_sens = distance(echo_value, trig_value)
-                        time.sleep(1)
-                        locker_open(servoVal)
-                        if door_sens > 10:
-                            break
-                        
-                    while door_sens >= 10:
-                        time.sleep(0.5)
-                        print("Door Open")
-                        print(door_sens)
-                        door_sens = distance(echo_value, trig_value)
-                        if door_sens < 10:
-                            time.sleep(2)
-                            locker_close(servoVal)
-                            print("closing door")
-                            updateLog(rentid) #updates log
-                            break
-                    break
-            else:
-                print("Invalid Locker Number or Password")
-                cursor.close()
-        else:
-            print("Database connection error")
-            # ~ connection.close()
+        
     
         
 class QrPage(tk.Frame):
@@ -324,11 +348,11 @@ class QrPage(tk.Frame):
             self.label_widget.photo_image = photo_image
             self.label_widget.configure(image=photo_image)
             
-            door_sens = distance()
+            # ~ door_sens = distance()
             # ~ print(locker_sens)
             if decoded_objects:
                 data = decoded_objects[0].data.decode('utf-8')
-                lockerNum, otp = data.split(',')
+                lockernum, otp = data.split(',')
 
                 cursor = connection.cursor()
                 query = """
@@ -337,43 +361,16 @@ class QrPage(tk.Frame):
                     INNER JOIN locker l ON r.locker_id = l.locker_id
                     WHERE l.locker_number = %s AND l.locker_otp = %s
                 """
-                cursor.execute(query, (lockerNum, otp))
+                cursor.execute(query, (lockernum, otp))
                 row = cursor.fetchone()
-                rentid = row[0]
-                lockerNum = row[7]
+                print(row)
+                # ~ rentid = row[0]
+                # ~ lockernum = row[1]
                 # ~ code to open and close the door
-                if lockerNum in lockerNumArr:
-                    servoVal = lockerNumArr[lockerNum]
-                    lockerSensor = locker_sens[lockerNum]
-                    echo_value = lockerSensor["Echo"]
-                    trig_value = lockerSensor["Trig"]
-                    while True:
-                        door_sens = distance(echo_value, trig_value)
-                        time.sleep(0.5)
-                        while door_sens <=10:
-                            door_sens = distance(echo_value, trig_value)
-                            time.sleep(1)
-                            locker_open(servoVal)
-                            if door_sens > 10:
-                                break
-                            
-                        while door_sens >= 10:
-                            time.sleep(0.5)
-                            print("Door Open")
-                            print(door_sens)
-                            door_sens = distance(echo_value, trig_value)
-                            if door_sens < 10:
-                                time.sleep(2)
-                                locker_close(servoVal)
-                                print("closing door")
-                                updateLog(rentid) #updates log
-                                break
-                        break
+                locker_checker(lockernum, otp)
                         
-                else:
-                    print("Invalid QR code data")
-
-                cursor.close()
+                # ~ else:
+                    # ~ print("Invalid QR code data")
                 self.close_camera()
                 # ~ vid.grab()
             
