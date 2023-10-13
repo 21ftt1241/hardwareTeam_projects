@@ -2,7 +2,6 @@ import customtkinter as ctk
 from functools import partial
 from tkinter import messagebox
 import cv2
-from PIL import Image, ImageTk
 import time
 import datetime
 import mysql.connector
@@ -12,6 +11,7 @@ import RPi.GPIO as GPIO
 import datetime
 import random
 import tkinter as tk
+from PIL import Image, ImageTk
 
 
 # Replace these values with your database configuration
@@ -361,7 +361,7 @@ class QrPage(ctk.CTkFrame):
         label.pack(pady=10, padx=10)
 
         # ~ this label widget is used to display the video feed
-        self.label_widget = tk.Label(self)  # Define label_widget as an instance variable
+        self.label_widget = ctk.CTkLabel(self)  # Define label_widget as an instance variable
         self.label_widget.place(relx=0.5, rely=0.55, anchor=tk.CENTER)
 
         self.button_bck = ctk.CTkButton(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller))
@@ -395,9 +395,9 @@ class QrPage(ctk.CTkFrame):
 
             # ~ capture the feed as image and parse it as a var to be displayed on the label_widget
             captured_image = Image.fromarray(opencv_image)
-            photo_image = ImageTk.PhotoImage(image=captured_image)
-            self.label_widget.photo_image = photo_image
-            self.label_widget.configure(image=photo_image)
+            ctk_image = tk.TkImage.PhotoImage(image=Image.fromarray(opencv_image))
+            self.label_widget.configure(image=ctk_image)
+            self.label_widget.image = ctk_image
             
             if decoded_objects:
                 data = decoded_objects[0].data.decode('utf-8')
@@ -415,7 +415,6 @@ class QrPage(ctk.CTkFrame):
                 print(row)
                 # ~ code to open and close the door
                 locker_checker(lockernum, otp)
-                        # ~ test
                 self.close_camera()
             
             else:

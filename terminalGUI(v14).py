@@ -247,14 +247,22 @@ def locker_checker(lockernum, otp):
 # ~ main design
 main_bg="#ffab1b"
 
-# ~ btn design
-btn_font = ('Helvetica', 12)
-btn_bg = "#499de6"
-btn_activ_bg = "#1e96ff"
+# ~ main btn design
+btn_font = ('Helvetica', 18, "bold")
+btn_fg = "#ffffff"
+btn_activ_fg = "#ffffff"
+btn_activ_bg = "#499de6"
+btn_bg = "#1e96ff"
 
 #title Design
-title_font = ('Helvetica' , 24, "bold")
+title_font = ('Helvetica' , 28, "bold")
 title_fg = "#0325a1"
+
+# ~ subtitle design
+sub_fg = "#0325a1"
+
+#side button
+sd_btn_font = ('Helvetica', 14, "bold")
         
 # ~ basically holds all the other page and manage the page swap
 class MainFrame(tk.Tk):
@@ -296,14 +304,14 @@ class StartPage(tk.Frame):
         button_frame = Frame(self, bg=main_bg)
         button_frame.pack(fill=BOTH, anchor=CENTER, expand=True)
 
-        self.button1 = Button(button_frame, text="Use OTP", width=35, height=18,
+        self.button1 = Button(button_frame, text="OTP", width=27, height=13,
                               command=lambda: controller.show_frame(PassPage)
-                              , bg=btn_bg, activebackground=btn_activ_bg, font=btn_font)
+                              , bg=btn_bg, activebackground=btn_activ_bg, font=btn_font, fg=btn_fg, activeforeground=btn_activ_fg)
         self.button1.place(relx=0.30, rely=0.5, anchor=CENTER)
 
-        self.button2 = Button(button_frame, text="Use QR Code", width=35, height=18,
+        self.button2 = Button(button_frame, text="QR Code", width=27, height=13,
                               command=lambda: controller.show_frame(QrPage)
-                              , bg=btn_bg, activebackground=btn_activ_bg, font=btn_font)
+                              , bg=btn_bg, activebackground=btn_activ_bg, font=btn_font, fg=btn_fg, activeforeground=btn_activ_fg)
         self.button2.place(relx=0.70, rely=0.5, anchor=CENTER)
 
 class PassPage(tk.Frame):
@@ -311,23 +319,24 @@ class PassPage(tk.Frame):
         Frame.__init__(self, parent, bg="#ffa91e")
         self.controller = controller
         self.controller.geometry("1024x600")
-        label = Label(self, text="Input Locker Number and OTP here")
+        label = Label(self, text="Input Locker Number and OTP here", font=title_font, bg=main_bg, fg=title_fg)
         label.pack(pady=10, padx=10)
 
-        label2 = Label(self, text="Locker Num", bg="orange")
+        label2 = Label(self, text="Locker Num", bg="orange", font=sd_btn_font, fg=sub_fg)
         label2.place(relx=0.5, rely=0.25, anchor=CENTER)
         self.lockernum = tk.StringVar()  # Make lockernum a class attribute
         idEntry = tk.Entry(self, textvariable=self.lockernum)
         idEntry.place(relx=0.5, rely=0.30, anchor=CENTER)
         idEntry.focus()
 
-        label3 = Label(self, text="OTP", bg="orange")
+        label3 = Label(self, text="OTP", bg="orange", font=sd_btn_font, fg=sub_fg)
         label3.place(relx=0.5, rely=0.4, anchor=CENTER)
         self.otp = tk.StringVar()  # Make otp a class attribute
         otpEntry = tk.Entry(self, textvariable=self.otp, show="*")
         otpEntry.place(relx=0.5, rely=0.45, anchor=CENTER)
     
-        openbutton = Button(self, text="Open Locker", command=lambda: self.openLocker(self.lockernum, self.otp))  # Pass the user input
+        openbutton = Button(self, text="Open Locker", command=lambda: self.openLocker(self.lockernum, self.otp)
+                                                    , bg=btn_bg, activebackground=btn_activ_bg, fg=btn_fg, activeforeground=btn_activ_fg, font=sd_btn_font)  # Pass the user input
         openbutton.place(relx=0.5, rely=0.55, anchor=CENTER)
         
         self.qr_page_instance = QrPage(parent, controller)  # Create an instance of QrPage
@@ -339,7 +348,8 @@ class PassPage(tk.Frame):
             idEntry.focus()
             controller.show_frame(StartPage)
             
-        homebutton = Button(self, text="Back to Home", command=goHome)
+        homebutton = Button(self, text="Back to Home", command=goHome
+                            , bg=btn_bg, activebackground=btn_activ_bg, fg=btn_fg, activeforeground=btn_activ_fg, font=sd_btn_font)
         homebutton.place(relx=0.5, rely=0.8, anchor=CENTER)
         
     def openLocker(self, lockernum, otp):
@@ -358,18 +368,20 @@ class QrPage(tk.Frame):
         
         self.frame = None
 
-        label = tk.Label(self, text="Scan QR code here")
+        label = tk.Label(self, text="Scan QR code here", bg=main_bg ,fg=title_fg, font=title_font)
         label.pack(pady=10, padx=10)
 
         # ~ this label widget is used to display the video feed
         self.label_widget = tk.Label(self, bg="#ffa91e")  # Define label_widget as an instance variable
         self.label_widget.place(relx=0.5, rely=0.55, anchor=tk.CENTER)
 
-        self.button_bck = tk.Button(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller))
-        self.button_bck.place(relx=0.75, rely=0.1, anchor=tk.CENTER)
+        self.button_bck = tk.Button(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller)
+                                    , bg=btn_bg, activebackground=btn_activ_bg, fg=btn_fg, activeforeground=btn_activ_fg, font=sd_btn_font)
+        self.button_bck.place(relx=0.75, rely=0.12, anchor=tk.CENTER)
 
-        self.button_camera = tk.Button(self, text="Toggle QR Scanner", command=self.toggle_camera)
-        self.button_camera.place(relx=0.25, rely=0.1, anchor=tk.CENTER)
+        self.button_camera = tk.Button(self, text="Toggle QR Scanner", command=self.toggle_camera
+                                    , bg=btn_bg, activebackground=btn_activ_bg, fg=btn_fg, activeforeground=btn_activ_fg, font=sd_btn_font)
+        self.button_camera.place(relx=0.25, rely=0.12, anchor=tk.CENTER)
 
         # Add a flag to control the camera feed
         self.camera_running = False
@@ -396,7 +408,7 @@ class QrPage(tk.Frame):
 
             # ~ capture the feed as image and parse it as a var to be displayed on the label_widget
             captured_image = Image.fromarray(opencv_image)
-            photo_image = ImageTk.PhotoImage(image=captured_image)
+            photo_image = ImageTk.PhotoImage(image=Image.fromarray(opencv_image))
             self.label_widget.photo_image = photo_image
             self.label_widget.configure(image=photo_image)
             
