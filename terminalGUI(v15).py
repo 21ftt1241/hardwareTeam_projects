@@ -415,7 +415,7 @@ class QrPage(ctk.CTkFrame):
                 print(row)
                 # ~ code to open and close the door
                 locker_checker(lockernum, otp)
-                        
+                        # ~ test
                 self.close_camera()
             
             else:
