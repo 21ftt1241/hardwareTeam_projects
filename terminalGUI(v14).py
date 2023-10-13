@@ -169,12 +169,6 @@ def locker_checker(lockernum, otp):
         
         if new_connection.is_connected():
             cursor = new_connection.cursor()
-            # ~ query = """
-                # ~ SELECT r.rent_id, l.locker_number
-                # ~ FROM rentdetail r
-                # ~ INNER JOIN locker l ON r.locker_id = l.locker_id
-                # ~ WHERE l.locker_number = %s AND l.locker_otp = %s
-            # ~ """
             query = """
                 SELECT r.rent_id, l.locker_number
                 FROM rentdetail r
@@ -250,12 +244,23 @@ def locker_checker(lockernum, otp):
         if 'new_connection' in locals() and new_connection.is_connected():
             new_connection.close()
 
+# ~ main design
+main_bg="#ffab1b"
 
+# ~ btn design
+btn_font = ('Helvetica', 12)
+btn_bg = "#499de6"
+btn_activ_bg = "#1e96ff"
+
+#title Design
+title_font = ('Helvetica' , 24, "bold")
+title_fg = "#0325a1"
+        
 # ~ basically holds all the other page and manage the page swap
 class MainFrame(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
-        self.attributes('-fullscreen', True)
+        # ~ self.attributes('-fullscreen', True)
         container = Frame(self)
 
         container.pack(side="top", fill="both", expand=True)
@@ -281,24 +286,29 @@ class MainFrame(tk.Tk):
 # ~ the global frame conf
 class StartPage(tk.Frame):
     def __init__(self, parent, controller):
-        Frame.__init__(self, parent)
+        Frame.__init__(self, parent, bg=main_bg)
         self.controller = controller
         self.controller.geometry("1024x600")
+        
+        title_lbl = Label(self, text="Drop N' Go", bg=main_bg ,fg=title_fg, font=title_font)
+        title_lbl.pack(pady=15, padx=10)
 
-        button_frame = Frame(self, bg="orange")
+        button_frame = Frame(self, bg=main_bg)
         button_frame.pack(fill=BOTH, anchor=CENTER, expand=True)
 
-        self.button1 = Button(button_frame, text="Use OTP", width=35, height=20,
-                              command=lambda: controller.show_frame(PassPage))
-        self.button1.place(relx=0.35, rely=0.5, anchor=CENTER)
+        self.button1 = Button(button_frame, text="Use OTP", width=35, height=18,
+                              command=lambda: controller.show_frame(PassPage)
+                              , bg=btn_bg, activebackground=btn_activ_bg, font=btn_font)
+        self.button1.place(relx=0.30, rely=0.5, anchor=CENTER)
 
-        self.button2 = Button(button_frame, text="Use QR Code", width=35, height=20,
-                              command=lambda: controller.show_frame(QrPage))
-        self.button2.place(relx=0.65, rely=0.5, anchor=CENTER)
+        self.button2 = Button(button_frame, text="Use QR Code", width=35, height=18,
+                              command=lambda: controller.show_frame(QrPage)
+                              , bg=btn_bg, activebackground=btn_activ_bg, font=btn_font)
+        self.button2.place(relx=0.70, rely=0.5, anchor=CENTER)
 
 class PassPage(tk.Frame):
     def __init__(self, parent, controller):
-        Frame.__init__(self, parent, bg="orange")
+        Frame.__init__(self, parent, bg="#ffa91e")
         self.controller = controller
         self.controller.geometry("1024x600")
         label = Label(self, text="Input Locker Number and OTP here")
@@ -340,11 +350,9 @@ class PassPage(tk.Frame):
         
         # ~ check the validity of Locker Num and OTP)
         
-    
-        
 class QrPage(tk.Frame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent, bg="orange")
+        tk.Frame.__init__(self, parent, bg="#ffa91e")
         self.controller = controller
         self.controller.geometry("1024x600")
         
@@ -354,7 +362,7 @@ class QrPage(tk.Frame):
         label.pack(pady=10, padx=10)
 
         # ~ this label widget is used to display the video feed
-        self.label_widget = tk.Label(self, bg="orange")  # Define label_widget as an instance variable
+        self.label_widget = tk.Label(self, bg="#ffa91e")  # Define label_widget as an instance variable
         self.label_widget.place(relx=0.5, rely=0.55, anchor=tk.CENTER)
 
         self.button_bck = tk.Button(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller))
