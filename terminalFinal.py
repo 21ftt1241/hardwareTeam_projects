@@ -12,8 +12,7 @@ import pigpio
 import RPi.GPIO as GPIO
 import datetime
 import random
-from gpiozero import Buzzer
-from time import sleep
+
 
 # Replace these values with your database configuration
 #Dont open this when streaming
@@ -38,8 +37,8 @@ pwm.set_mode(servo2, pigpio.OUTPUT)
 
 # ~ locker number : servo pin
 lockerNumArr = {
-    "OS1":12,
-    "OS2":16
+    "MG1":12,
+    "MG5":16
 }
 
 #GPIO Mode (BOARD / BCM)
@@ -63,11 +62,11 @@ GPIO.setup(GPIO_ECHO2, GPIO.IN)
 # ~ trig1:echo1
 # ~ insert new sensor pin num here
 locker_sens = {
-    "OS1": {
+    "MG1": {
     "Trig": 23,
     "Echo": 18
     },
-    "OS2":{
+    "MG5":{
     "Trig": 25,
     "Echo": 24
     }
@@ -82,23 +81,6 @@ width, height = 640, 480
 # Set the width and height
 vid.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 vid.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-
-# ~ Buzzer pin
-buzz = Buzzer(21)
-
-def locker_buzz_open():
-    for _ in range(2):
-        buzz.on()
-        sleep(0.1)
-        buzz.off()
-        sleep(0.1)
-
-def locker_buzz_close():
-    for _ in range(4):
-        buzz.on()
-        sleep(0.1)
-        buzz.off()
-        sleep(0.1)
 
 def distance(echo_value, trig_value):
     # set Trigger to HIGH
@@ -155,32 +137,29 @@ def genPass(lockerNum):
         
         cursor.close()
         
-# ~ def timer(door_sens):
-    # ~ start_time = time.time()
-    # ~ while True:
-        # ~ elapsed_time = time.time() - start_time
-        # ~ if door_sens >= 10:
-            # ~ if elapsed_time >= 10:
-                # ~ messagebox.showerror("BEWARE", "CLOSE THE LOCKER DOOR WHEN NOT IN USE")
-                # ~ break
-            # ~ else:
-                # ~ print(elapsed_time)
-                # ~ break
-            # ~ print(door_sens)
+def timer(door_sens):
+    start_time = time.time()
+    while True:
+        elapsed_time = time.time() - start_time
+        if door_sens >= 10:
+            if elapsed_time >= 10:
+                messagebox.showerror("BEWARE", "CLOSE THE LOCKER DOOR WHEN NOT IN USE")
+                break
+            else:
+                print(elapsed_time)
+                break
+            print(door_sens)
     
         
 def locker_open(servoVal):
     pwm.set_servo_pulsewidth(servoVal, 500)
     pwm.set_PWM_frequency(servoVal, 50)
     print("Servo lock open")
-    # ~ locker_buzz_open()
-
     
 def locker_close(servoVal):
     pwm.set_servo_pulsewidth(servoVal, 1500)
     pwm.set_PWM_frequency(servoVal, 50)
     print("Servo lock close")
-    locker_buzz_close()
     
 
 def locker_checker(lockernum, otp):
@@ -206,12 +185,12 @@ def locker_checker(lockernum, otp):
             print(row)
             
             if row is None:
+                print("Invalid Data")
                 messagebox.showerror("Invalid Data", "The Locker Number / OTP is Invalid")
                 return
-            elif row is not None:
-                messagebox.showinfo("Valid Data", "Locker " + row[1] + " is now unlocked\n Click OK to Continue")
-                locker_buzz_open()
+            print("Data is valid")
                 
+            
             # Assign rentid to a var
             rentid = row[0]
             
@@ -224,9 +203,7 @@ def locker_checker(lockernum, otp):
                 lockerSensor = locker_sens[lockerNum]
                 echo_value = lockerSensor["Echo"]
                 trig_value = lockerSensor["Trig"]
-                timer_start = None
-                main_loop_flag = True
-                while main_loop_flag:
+                while True:
                     door_sens = distance(echo_value, trig_value)
                     time.sleep(0.5)
                     while door_sens <= 10:
@@ -236,38 +213,21 @@ def locker_checker(lockernum, otp):
                         print("Locker door closed")
                         if door_sens > 10:
                             break
-                    door_sens_flag = True
-                    while door_sens_flag and door_sens >= 10:
-                        door_sens = distance(echo_value, trig_value)
+                        
+                    while door_sens >= 10:
                         time.sleep(0.5)
+                        door_sens = distance(echo_value, trig_value)
                         print("locker door open")
+                        # ~ timer(door_sens)
                         if door_sens < 10:
-                            timer_flag = True
-                            while timer_flag:
-                                if timer_start is None:
-                                    timer_start = time.time()
-                                    print("Start the timer")
-                                elapsed_time = time.time() - timer_start
-                                print("Elapsed time 251: ", elapsed_time)
-                                time.sleep(0.2)
-                                door_sense2 = distance(echo_value, trig_value)
-                                print("line 254 door ", door_sense2)
-                                if door_sense2 > 10:
-                                    elapsed_time = 0
-                                    timer_flag = False
-                                print("line 257 elapsed: ", elapsed_time)
-                                if elapsed_time >=4:
-                                    locker_close(servoVal)
-                                    updateLog(rentid)
-                                    genPass(lockerNum)
-                                    print("Close servo Lock")
-                                    door_sens_flag = False
-                                    main_loop_flag = False
-                                    break
-                        else:    
-                            timer_start = None
-                            timer_flag = False
+                            time.sleep(2)
+                            locker_close(servoVal)
+                            updateLog(rentid)  # Updates log
+                            genPass(lockerNum)
+                            break
+                    break
             else:
+                print("Invalid Data")
                 messagebox.showerror("Locker unavailable", "Locker is not available")
                 return
                 
@@ -465,14 +425,11 @@ class QrPage(tk.Frame):
                 """
                 cursor.execute(query, (lockernum, otp))
                 row = cursor.fetchone()
-    
-                
                 print(row)
-                self.close_camera()
                 # ~ code to open and close the door
                 locker_checker(lockernum, otp)
                         
-                # ~ self.close_camera()
+                self.close_camera()
             
             else:
                 print("No Data")
