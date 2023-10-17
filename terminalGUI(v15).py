@@ -1,7 +1,9 @@
-import customtkinter as ctk
+import tkinter as tk
+from tkinter import *
 from functools import partial
 from tkinter import messagebox
 import cv2
+from PIL import Image, ImageTk
 import time
 import datetime
 import mysql.connector
@@ -10,9 +12,8 @@ import pigpio
 import RPi.GPIO as GPIO
 import datetime
 import random
-import tkinter as tk
-from PIL import Image, ImageTk
-
+from gpiozero import Buzzer
+from time import sleep
 
 # Replace these values with your database configuration
 #Dont open this when streaming
@@ -37,8 +38,8 @@ pwm.set_mode(servo2, pigpio.OUTPUT)
 
 # ~ locker number : servo pin
 lockerNumArr = {
-    "MG1":12,
-    "MG5":16
+    "OS1":12,
+    "OS2":16
 }
 
 #GPIO Mode (BOARD / BCM)
@@ -62,11 +63,11 @@ GPIO.setup(GPIO_ECHO2, GPIO.IN)
 # ~ trig1:echo1
 # ~ insert new sensor pin num here
 locker_sens = {
-    "MG1": {
+    "OS1": {
     "Trig": 23,
     "Echo": 18
     },
-    "MG5":{
+    "OS2":{
     "Trig": 25,
     "Echo": 24
     }
@@ -81,6 +82,23 @@ width, height = 640, 480
 # Set the width and height
 vid.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 vid.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+
+# ~ Buzzer pin
+buzz = Buzzer(21)
+
+def locker_buzz_open():
+    for _ in range(2):
+        buzz.on()
+        sleep(0.1)
+        buzz.off()
+        sleep(0.1)
+
+def locker_buzz_close():
+    for _ in range(4):
+        buzz.on()
+        sleep(0.1)
+        buzz.off()
+        sleep(0.1)
 
 def distance(echo_value, trig_value):
     # set Trigger to HIGH
@@ -137,29 +155,32 @@ def genPass(lockerNum):
         
         cursor.close()
         
-def timer(door_sens):
-    start_time = time.time()
-    while True:
-        elapsed_time = time.time() - start_time
-        if door_sens >= 10:
-            if elapsed_time >= 10:
-                messagebox.showerror("BEWARE", "CLOSE THE LOCKER DOOR WHEN NOT IN USE")
-                break
-            else:
-                print(elapsed_time)
-                break
-            print(door_sens)
+# ~ def timer(door_sens):
+    # ~ start_time = time.time()
+    # ~ while True:
+        # ~ elapsed_time = time.time() - start_time
+        # ~ if door_sens >= 10:
+            # ~ if elapsed_time >= 10:
+                # ~ messagebox.showerror("BEWARE", "CLOSE THE LOCKER DOOR WHEN NOT IN USE")
+                # ~ break
+            # ~ else:
+                # ~ print(elapsed_time)
+                # ~ break
+            # ~ print(door_sens)
     
         
 def locker_open(servoVal):
     pwm.set_servo_pulsewidth(servoVal, 500)
     pwm.set_PWM_frequency(servoVal, 50)
     print("Servo lock open")
+    # ~ locker_buzz_open()
+
     
 def locker_close(servoVal):
     pwm.set_servo_pulsewidth(servoVal, 1500)
     pwm.set_PWM_frequency(servoVal, 50)
     print("Servo lock close")
+    locker_buzz_close()
     
 
 def locker_checker(lockernum, otp):
@@ -185,12 +206,12 @@ def locker_checker(lockernum, otp):
             print(row)
             
             if row is None:
-                print("Invalid Data")
                 messagebox.showerror("Invalid Data", "The Locker Number / OTP is Invalid")
                 return
-            print("Data is valid")
+            elif row is not None:
+                messagebox.showinfo("Valid Data", "Locker " + row[1] + " is now unlocked")
+                locker_buzz_open()
                 
-            
             # Assign rentid to a var
             rentid = row[0]
             
@@ -203,7 +224,9 @@ def locker_checker(lockernum, otp):
                 lockerSensor = locker_sens[lockerNum]
                 echo_value = lockerSensor["Echo"]
                 trig_value = lockerSensor["Trig"]
-                while True:
+                timer_start = None
+                main_loop_flag = True
+                while main_loop_flag:
                     door_sens = distance(echo_value, trig_value)
                     time.sleep(0.5)
                     while door_sens <= 10:
@@ -213,21 +236,40 @@ def locker_checker(lockernum, otp):
                         print("Locker door closed")
                         if door_sens > 10:
                             break
-                        
-                    while door_sens >= 10:
-                        time.sleep(0.5)
+                    door_sens_flag = True
+                    while door_sens_flag and door_sens >= 10:
                         door_sens = distance(echo_value, trig_value)
+                        time.sleep(0.5)
                         print("locker door open")
-                        # ~ timer(door_sens)
                         if door_sens < 10:
-                            time.sleep(2)
-                            locker_close(servoVal)
-                            updateLog(rentid)  # Updates log
-                            genPass(lockerNum)
-                            break
-                    break
+                            timer_flag = True
+                            while timer_flag:
+                                if timer_start is None:
+                                    timer_start = time.time()
+                                    print("Start the timer")
+                                elapsed_time = time.time() - timer_start
+                                print("Elapsed time 251: ", elapsed_time)
+                                time.sleep(0.2)
+                                door_sense2 = distance(echo_value, trig_value)
+                                print("line 254 door ", door_sense2)
+                                if door_sense2 > 10:
+                                    elapsed_time = 0
+                                    timer_flag = False
+                                print("line 257 elapsed: ", elapsed_time)
+                                if elapsed_time >=5:
+                                    locker_close(servoVal)
+                                    updateLog(rentid)
+                                    genPass(lockerNum)
+                                    print("Close servo Lock")
+                                    door_sens_flag = False
+                                    main_loop_flag = False
+                                    break
+                            if elapsed_time >= 3:
+                                break
+                        else:    
+                            timer_start = None
+                            timer_flag = False
             else:
-                print("Invalid Data")
                 messagebox.showerror("Locker unavailable", "Locker is not available")
                 return
                 
@@ -247,23 +289,32 @@ def locker_checker(lockernum, otp):
 # ~ main design
 main_bg="#ffab1b"
 
-# ~ btn design
-btn_font = ('Helvetica', 12)
-btn_bg = "#499de6"
-btn_activ_bg = "#1e96ff"
+# ~ main btn design
+btn_font = ('Helvetica', 18, "bold")
+btn_fg = "#ffffff"
+btn_activ_fg = "#ffffff"
+btn_activ_bg = "#499de6"
+btn_bg = "#1e96ff"
 
 #title Design
-title_font = ('Helvetica' , 24, "bold")
+title_font = ('Helvetica' , 28, "bold")
 title_fg = "#0325a1"
+
+# ~ subtitle design
+sub_fg = "#0325a1"
+
+#side button
+sd_btn_font = ('Helvetica', 14, "bold")
         
 # ~ basically holds all the other page and manage the page swap
-class MainFrame(ctk.CTk):
+class MainFrame(tk.Tk):
     def __init__(self, *args, **kwargs):
-        ctk.CTk.__init__(self, *args, **kwargs)
+        tk.Tk.__init__(self, *args, **kwargs)
         # ~ self.attributes('-fullscreen', True)
-        container = ctk.CTkFrame(self)
+        container = Frame(self)
 
         container.pack(side="top", fill="both", expand=True)
+
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
 
@@ -283,63 +334,65 @@ class MainFrame(ctk.CTk):
         frame.tkraise()
 
 # ~ the global frame conf
-class StartPage(ctk.CTkFrame):
+class StartPage(tk.Frame):
     def __init__(self, parent, controller):
-        ctk.CTkFrame.__init__(self, parent, fg_color=main_bg)
+        Frame.__init__(self, parent, bg=main_bg)
         self.controller = controller
         self.controller.geometry("1024x600")
         
-        title_lbl = ctk.CTkLabel(self, text="Drop N' Go", font=title_font)
+        title_lbl = Label(self, text="Drop N' Go", bg=main_bg ,fg=title_fg, font=title_font)
         title_lbl.pack(pady=15, padx=10)
 
-        button_frame = ctk.CTkFrame(self, fg_color=main_bg)
-        button_frame.pack()
+        button_frame = Frame(self, bg=main_bg)
+        button_frame.pack(fill=BOTH, anchor=CENTER, expand=True)
 
-        self.button1 = ctk.CTkButton(button_frame, text="Use OTP", width=260, height=260,
+        self.button1 = Button(button_frame, text="OTP", width=27, height=13,
                               command=lambda: controller.show_frame(PassPage)
-                              , font=btn_font)
-        self.button1.grid(row=1,column=0, padx=20, pady=80)
+                              , bg=btn_bg, activebackground=btn_activ_bg, font=btn_font, fg=btn_fg, activeforeground=btn_activ_fg)
+        self.button1.place(relx=0.30, rely=0.5, anchor=CENTER)
 
-        self.button2 = ctk.CTkButton(button_frame, text="Use QR Code", width=260, height=260,
+        self.button2 = Button(button_frame, text="QR Code", width=27, height=13,
                               command=lambda: controller.show_frame(QrPage)
-                              , font=btn_font)
-        self.button2.grid(row=1,column=1, padx=20, pady=80)
+                              , bg=btn_bg, activebackground=btn_activ_bg, font=btn_font, fg=btn_fg, activeforeground=btn_activ_fg)
+        self.button2.place(relx=0.70, rely=0.5, anchor=CENTER)
 
-class PassPage(ctk.CTkFrame):
+class PassPage(tk.Frame):
     def __init__(self, parent, controller):
-        ctk.CTkFrame.__init__(self, parent, fg_color="#ffa91e")
+        Frame.__init__(self, parent, bg="#ffa91e")
         self.controller = controller
         self.controller.geometry("1024x600")
-        label = ctk.CTkLabel(self, text="Input Locker Number and OTP here")
+        label = Label(self, text="Input Locker Number and OTP here", font=title_font, bg=main_bg, fg=title_fg)
         label.pack(pady=10, padx=10)
 
-        label2 = ctk.CTkLabel(self, text="Locker Num")
-        label2.place(relx=0.5, rely=0.25, anchor="center")
-        self.lockernum = ctk.StringVar()  # Make lockernum a class attribute
-        idEntry = ctk.CTkEntry(self, textvariable=self.lockernum)
-        idEntry.place(relx=0.5, rely=0.30, anchor="center")
+        label2 = Label(self, text="Locker Num", bg="orange", font=sd_btn_font, fg=sub_fg)
+        label2.place(relx=0.5, rely=0.25, anchor=CENTER)
+        self.lockernum = tk.StringVar()  # Make lockernum a class attribute
+        idEntry = tk.Entry(self, textvariable=self.lockernum)
+        idEntry.place(relx=0.5, rely=0.30, anchor=CENTER)
         idEntry.focus()
 
-        label3 = ctk.CTkLabel(self, text="OTP")
-        label3.place(relx=0.5, rely=0.4, anchor="center")
-        self.otp = ctk.StringVar()  # Make otp a class attribute
-        otpEntry = ctk.CTkEntry(self, textvariable=self.otp, show="*")
-        otpEntry.place(relx=0.5, rely=0.45, anchor="center")
+        label3 = Label(self, text="OTP", bg="orange", font=sd_btn_font, fg=sub_fg)
+        label3.place(relx=0.5, rely=0.4, anchor=CENTER)
+        self.otp = tk.StringVar()  # Make otp a class attribute
+        otpEntry = tk.Entry(self, textvariable=self.otp, show="*")
+        otpEntry.place(relx=0.5, rely=0.45, anchor=CENTER)
     
-        openbutton = ctk.CTkButton(self, text="Open Locker", command=lambda: self.openLocker(self.lockernum, self.otp))  # Pass the user input
-        openbutton.place(relx=0.5, rely=0.55, anchor="center")
+        openbutton = Button(self, text="Open Locker", command=lambda: self.openLocker(self.lockernum, self.otp)
+                                                    , bg=btn_bg, activebackground=btn_activ_bg, fg=btn_fg, activeforeground=btn_activ_fg, font=sd_btn_font)  # Pass the user input
+        openbutton.place(relx=0.5, rely=0.55, anchor=CENTER)
         
         self.qr_page_instance = QrPage(parent, controller)  # Create an instance of QrPage
         
         # ~ used to refresh the user input when going back to home
         def goHome():
-            idEntry.delete(0,)
-            otpEntry.delete(0)
+            idEntry.delete(0, END)
+            otpEntry.delete(0, END)
             idEntry.focus()
             controller.show_frame(StartPage)
             
-        homebutton = ctk.CTkButton(self, text="Back to Home", command=goHome)
-        homebutton.place(relx=0.5, rely=0.8, anchor="center")
+        homebutton = Button(self, text="Back to Home", command=goHome
+                            , bg=btn_bg, activebackground=btn_activ_bg, fg=btn_fg, activeforeground=btn_activ_fg, font=sd_btn_font)
+        homebutton.place(relx=0.5, rely=0.8, anchor=CENTER)
         
     def openLocker(self, lockernum, otp):
         lockernum = lockernum.get()
@@ -349,26 +402,28 @@ class PassPage(ctk.CTkFrame):
         
         # ~ check the validity of Locker Num and OTP)
         
-class QrPage(ctk.CTkFrame):
+class QrPage(tk.Frame):
     def __init__(self, parent, controller):
-        ctk.CTkFrame.__init__(self, parent)
+        tk.Frame.__init__(self, parent, bg="#ffa91e")
         self.controller = controller
         self.controller.geometry("1024x600")
         
         self.frame = None
 
-        label = ctk.CTkLabel(self, text="Scan QR code here")
+        label = tk.Label(self, text="Scan QR code here", bg=main_bg ,fg=title_fg, font=title_font)
         label.pack(pady=10, padx=10)
 
         # ~ this label widget is used to display the video feed
-        self.label_widget = ctk.CTkLabel(self)  # Define label_widget as an instance variable
+        self.label_widget = tk.Label(self, bg="#ffa91e")  # Define label_widget as an instance variable
         self.label_widget.place(relx=0.5, rely=0.55, anchor=tk.CENTER)
 
-        self.button_bck = ctk.CTkButton(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller))
-        self.button_bck.place(relx=0.75, rely=0.1, anchor="center")
+        self.button_bck = tk.Button(self, text="Back to Home", command=lambda: self.close_camera_and_return(controller)
+                                    , bg=btn_bg, activebackground=btn_activ_bg, fg=btn_fg, activeforeground=btn_activ_fg, font=sd_btn_font)
+        self.button_bck.place(relx=0.75, rely=0.12, anchor=tk.CENTER)
 
-        self.button_camera = ctk.CTkButton(self, text="Toggle QR Scanner", command=self.toggle_camera)
-        self.button_camera.place(relx=0.25, rely=0.1, anchor="center")
+        self.button_camera = tk.Button(self, text="Toggle QR Scanner", command=self.toggle_camera
+                                    , bg=btn_bg, activebackground=btn_activ_bg, fg=btn_fg, activeforeground=btn_activ_fg, font=sd_btn_font)
+        self.button_camera.place(relx=0.25, rely=0.12, anchor=tk.CENTER)
 
         # Add a flag to control the camera feed
         self.camera_running = False
@@ -395,9 +450,9 @@ class QrPage(ctk.CTkFrame):
 
             # ~ capture the feed as image and parse it as a var to be displayed on the label_widget
             captured_image = Image.fromarray(opencv_image)
-            ctk_image = tk.TkImage.PhotoImage(image=Image.fromarray(opencv_image))
-            self.label_widget.configure(image=ctk_image)
-            self.label_widget.image = ctk_image
+            photo_image = ImageTk.PhotoImage(image=Image.fromarray(opencv_image))
+            self.label_widget.photo_image = photo_image
+            self.label_widget.configure(image=photo_image)
             
             if decoded_objects:
                 data = decoded_objects[0].data.decode('utf-8')
@@ -412,9 +467,17 @@ class QrPage(ctk.CTkFrame):
                 """
                 cursor.execute(query, (lockernum, otp))
                 row = cursor.fetchone()
+                
+                # ~ if row is None:
+                    # ~ messagebox.showerror("Invalid Data", "The Locker Number / OTP is Invalid")
+                    # ~ return
+                # ~ elif row is not None:
+                    # ~ messagebox.showinfo("Valid Data", "Locker " + row[1] + " is now unlocked")
+                
                 print(row)
                 # ~ code to open and close the door
                 locker_checker(lockernum, otp)
+                        
                 self.close_camera()
             
             else:
@@ -436,13 +499,13 @@ class QrPage(ctk.CTkFrame):
         print("Open cam")
         self.start_time = time.time()  # Store the start time
         self.camera_running = True
-        self.button_bck.configure(state=tk.DISABLED)
+        self.button_bck.config(state=tk.DISABLED)
         self.camera_feed_loop()
         
     def close_camera(self):
         print("close cam")
         self.camera_running = False
-        self.button_bck.configure(state=tk.NORMAL)
+        self.button_bck.config(state=tk.NORMAL)
 
         # Reset the label_widget
         self.label_widget.photo_image = None
