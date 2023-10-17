@@ -209,7 +209,7 @@ def locker_checker(lockernum, otp):
                 messagebox.showerror("Invalid Data", "The Locker Number / OTP is Invalid")
                 return
             elif row is not None:
-                messagebox.showinfo("Valid Data", "Locker " + row[1] + " is now unlocked")
+                messagebox.showinfo("Valid Data", "Locker " + row[1] + " is now unlocked\n Click OK to Continue")
                 locker_buzz_open()
                 
             # Assign rentid to a var
@@ -256,7 +256,7 @@ def locker_checker(lockernum, otp):
                                     elapsed_time = 0
                                     timer_flag = False
                                 print("line 257 elapsed: ", elapsed_time)
-                                if elapsed_time >=5:
+                                if elapsed_time >=4:
                                     locker_close(servoVal)
                                     updateLog(rentid)
                                     genPass(lockerNum)
@@ -264,8 +264,6 @@ def locker_checker(lockernum, otp):
                                     door_sens_flag = False
                                     main_loop_flag = False
                                     break
-                            if elapsed_time >= 3:
-                                break
                         else:    
                             timer_start = None
                             timer_flag = False
@@ -310,7 +308,7 @@ sd_btn_font = ('Helvetica', 14, "bold")
 class MainFrame(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
-        # ~ self.attributes('-fullscreen', True)
+        self.attributes('-fullscreen', True)
         container = Frame(self)
 
         container.pack(side="top", fill="both", expand=True)
@@ -467,18 +465,14 @@ class QrPage(tk.Frame):
                 """
                 cursor.execute(query, (lockernum, otp))
                 row = cursor.fetchone()
-                
-                # ~ if row is None:
-                    # ~ messagebox.showerror("Invalid Data", "The Locker Number / OTP is Invalid")
-                    # ~ return
-                # ~ elif row is not None:
-                    # ~ messagebox.showinfo("Valid Data", "Locker " + row[1] + " is now unlocked")
+    
                 
                 print(row)
+                self.close_camera()
                 # ~ code to open and close the door
                 locker_checker(lockernum, otp)
                         
-                self.close_camera()
+                # ~ self.close_camera()
             
             else:
                 print("No Data")
