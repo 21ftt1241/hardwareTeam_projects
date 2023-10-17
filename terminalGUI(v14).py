@@ -37,8 +37,8 @@ pwm.set_mode(servo2, pigpio.OUTPUT)
 
 # ~ locker number : servo pin
 lockerNumArr = {
-    "MG1":12,
-    "MG5":16
+    "OS1":12,
+    "OS2":16
 }
 
 #GPIO Mode (BOARD / BCM)
@@ -62,11 +62,11 @@ GPIO.setup(GPIO_ECHO2, GPIO.IN)
 # ~ trig1:echo1
 # ~ insert new sensor pin num here
 locker_sens = {
-    "MG1": {
+    "OS1": {
     "Trig": 23,
     "Echo": 18
     },
-    "MG5":{
+    "OS2":{
     "Trig": 25,
     "Echo": 24
     }
@@ -185,12 +185,11 @@ def locker_checker(lockernum, otp):
             print(row)
             
             if row is None:
-                print("Invalid Data")
                 messagebox.showerror("Invalid Data", "The Locker Number / OTP is Invalid")
                 return
-            print("Data is valid")
+            elif row is not None:
+                messagebox.showinfo("Valid Data", "Locker " + row[1] + " is now unlocked")
                 
-            
             # Assign rentid to a var
             rentid = row[0]
             
@@ -425,6 +424,13 @@ class QrPage(tk.Frame):
                 """
                 cursor.execute(query, (lockernum, otp))
                 row = cursor.fetchone()
+                
+                if row is None:
+                    messagebox.showerror("Invalid Data", "The Locker Number / OTP is Invalid")
+                    return
+                elif row is not None:
+                    messagebox.showinfo("Valid Data", "Locker " + row[1] + " is now unlocked")
+                
                 print(row)
                 # ~ code to open and close the door
                 locker_checker(lockernum, otp)
