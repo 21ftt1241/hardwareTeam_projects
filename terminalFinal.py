@@ -268,7 +268,7 @@ sd_btn_font = ('Helvetica', 14, "bold")
 class MainFrame(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
-        self.attributes('-fullscreen', True)
+        # ~ self.attributes('-fullscreen', True)
         container = Frame(self)
 
         container.pack(side="top", fill="both", expand=True)
