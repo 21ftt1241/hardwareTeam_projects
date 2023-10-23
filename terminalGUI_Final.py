@@ -180,7 +180,7 @@ def locker_checker(lockernum, otp):
     try:
         # Establish a new connection for this function
         new_connection = mysql.connector.connect(**db_config)
-        # ~ test
+        # ~ test2
         if new_connection.is_connected():
             cursor = new_connection.cursor()
             query = """
