@@ -125,7 +125,7 @@ def distance(echo_value, trig_value):
     # and divide by 2, because there and back
     distance = (TimeElapsed * 34300) / 2
     distance = round(distance, 2)
- 
+
     return distance
 
 def updateLog(rentid):
@@ -166,7 +166,7 @@ def locker_open(servoVal):
     pwm.set_servo_pulsewidth(servoVal, 500)
     pwm.set_PWM_frequency(servoVal, 50)
     print("Servo lock open")
-    # ~ locker_buzz_open()
+    locker_buzz_open()
 
     
 def locker_close(servoVal):
@@ -203,7 +203,6 @@ def locker_checker(lockernum, otp):
                 return
             elif row is not None:
                 messagebox.showinfo("Valid Data", "Locker " + row[1] + " is now unlocked\n Click OK to Continue")
-                locker_buzz_open()
                 
             # Assign rentid to a var
             rentid = row[0]
@@ -241,22 +240,20 @@ def locker_checker(lockernum, otp):
                                     timer_start = time.time()
                                     print("Start the timer")
                                 elapsed_time = time.time() - timer_start
-                                print("Elapsed time 251: ", elapsed_time)
                                 time.sleep(0.2)
                                 door_sense2 = distance(echo_value, trig_value)
-                                print("line 254 door ", door_sense2)
                                 if door_sense2 > 10:
                                     elapsed_time = 0
                                     timer_flag = False
-                                print("line 257 elapsed: ", elapsed_time)
-                                if elapsed_time >=4:
+                                print("Door closed elapsed: ", elapsed_time)
+                                #The statement below tells how long will the sensor detects 
+                                # ~ the door to be in close state before closing the servo lock
+                                if elapsed_time >=2.5:
                                     locker_close(servoVal)
-                                    print("line 261: ",rentid)
                                     cursor.close()
                                     new_connection.close()
                                     updateLog(rentid)
                                     genPass(lockerNum)
-                                    print("Close servo Lock")
                                     door_sens_flag = False
                                     main_loop_flag = False
                                     break
